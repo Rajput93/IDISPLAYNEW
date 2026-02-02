@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <!-- Rounded blue rectangle -->
+    <path
+        android:pathData="M12,0 L108,0 Q120,0 120,12 L120,108 Q120,120 108,120 L12,120 Q0,120 0,108 L0,12 Q0,0 12,0 Z"
+        android:fillColor="#2F80ED" />
+    <!-- White monitor/screen outline -->
+    <path
+        android:pathData="M30,35 L90,35 L95,50 L95,85 L25,85 L25,50 Z"
+        android:strokeWidth="4"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+    <!-- Monitor stand -->
+    <path
+        android:pathData="M52,85 L52,100 L68,100 L68,85"
+        android:strokeWidth="4"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M45,100 L75,100"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF" />
+</vector>
