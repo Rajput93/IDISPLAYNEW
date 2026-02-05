@@ -17,7 +17,7 @@ import java.net.SocketTimeoutException
 
 data class LoginUiState(
     val baseUrl: String = "https://idisplay-backend.digitalnoticeboard.biz/api/",
-    val clientId: String = ""
+    val clientId: String = "DVC-469407DD"
 )
 
 class LoginViewModel(private val repository: Repository, private val dataStoreManager: DataStoreManager) : ViewModel() {
@@ -71,6 +71,10 @@ class LoginViewModel(private val repository: Repository, private val dataStoreMa
                 if (response.isSuccess) {
                     _registerResponse.value = response
                     _error.value = null
+                    response.result?.let { result ->
+                        dataStoreManager.saveAuthToken(result.token)
+                        dataStoreManager.saveBaseUrl(baseUrl)
+                    }
                 } else {
                     _error.value = response.message.takeIf { it.isNotBlank() }
                         ?: response.errors.flatMap { (key, msgs) -> msgs.map { msg -> "$key: $msg" } }.joinToString(" ")

@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.serialization)  // Required for @Serializable; generates serializer at compile time
 }
 
 android {
@@ -73,6 +73,11 @@ dependencies {
 
     implementation("androidx.navigation:navigation-compose:2.7.3")
     implementation("io.coil-kt:coil-compose:2.1.0")
+
+    // Video playback (ExoPlayer / Media3)
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-common:1.2.1")
 
     //data store(sharedPreference)
     implementation("androidx.datastore:datastore-preferences:1.1.2")

@@ -25,6 +25,7 @@ class DataStoreManager(private val context: Context) {
         private val UserTypeId = intPreferencesKey("userTypeId")
         private val RoleId = intPreferencesKey("roleId")
         private val AUTH_TOKEN_KEY = stringPreferencesKey("auth_token")
+        private val BASE_URL_KEY = stringPreferencesKey("base_url")
         private val FULL_NAME_KEY = stringPreferencesKey("full_name")
         private val EMAIL = stringPreferencesKey("email")
         private val PHONE_NO = stringPreferencesKey("phoneNo")
@@ -87,6 +88,13 @@ class DataStoreManager(private val context: Context) {
     suspend fun saveAuthToken(token: String) {
         context.dataStore.edit { preferences ->
             preferences[AUTH_TOKEN_KEY] = token
+        }
+    }
+
+    // Save Base URL (for schedule API)
+    suspend fun saveBaseUrl(baseUrl: String) {
+        context.dataStore.edit { preferences ->
+            preferences[BASE_URL_KEY] = baseUrl.trim().let { if (it.endsWith("/")) it else "$it/" }
         }
     }
 
@@ -164,6 +172,11 @@ class DataStoreManager(private val context: Context) {
     // Retrieve Auth Token
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[AUTH_TOKEN_KEY]
+    }
+
+    // Retrieve Base URL
+    val baseUrl: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[BASE_URL_KEY]
     }
 
     // Retrieve Full Name

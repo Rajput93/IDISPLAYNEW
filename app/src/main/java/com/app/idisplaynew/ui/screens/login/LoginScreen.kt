@@ -21,6 +21,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -30,9 +34,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -52,15 +59,38 @@ import com.app.idisplaynew.ui.theme.DisplayHubTextSecondary
 import com.app.idisplaynew.ui.utils.rememberResponsiveValues
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel) {
+fun LoginScreen(
+    viewModel: LoginViewModel,
+    onLoginSuccess: () -> Unit
+) {
     val uiState by viewModel.uiState.collectAsState()
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
     val error by viewModel.error.observeAsState(initial = null)
+    val registerResponse by viewModel.registerResponse.observeAsState(initial = null)
+    val snackbarHostState = remember { SnackbarHostState() }
     val responsive = rememberResponsiveValues()
     val scrollState = rememberScrollState()
 
+    LaunchedEffect(registerResponse) {
+        registerResponse?.let { response ->
+            if (response.isSuccess) {
+                snackbarHostState.showSnackbar(
+                    message = response.message.ifBlank { "Device registered successfully" },
+                    withDismissAction = true
+                )
+                delay(1500)
+                viewModel.clearRegisterResponse()
+                onLoginSuccess()
+            }
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) { data -> Snackbar(snackbarData = data) } }
+    ) { paddingValues ->
     Box(
         modifier = Modifier
+            .padding(paddingValues)
             .fillMaxSize()
             .background(DisplayHubBackground)
             .imePadding()
@@ -238,5 +268,6 @@ fun LoginScreen(viewModel: LoginViewModel) {
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
     }
 }
