@@ -19,7 +19,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.room.Room
+import com.app.idisplaynew.data.local.AppDatabase
+import com.app.idisplaynew.data.local.MediaDownloadManager
 import com.app.idisplaynew.data.repository.Repository
+import com.app.idisplaynew.data.repository.ScheduleRepository
 import com.app.idisplaynew.data.viewmodel.HomeViewModel
 import com.app.idisplaynew.data.viewmodel.HomeViewModelFactory
 import com.app.idisplaynew.data.viewmodel.LoginViewModel
@@ -48,8 +52,11 @@ private fun DisplayHubApp() {
     val navController = rememberNavController()
     NavHost(
         navController = navController,
-        startDestination = "splash"
+        startDestination = "login"
     ) {
+
+        // Splash screen temporarily disabled
+        /*
         composable("splash") {
             SplashScreen(
                 onSplashFinished = {
@@ -59,6 +66,8 @@ private fun DisplayHubApp() {
                 }
             )
         }
+        */
+
         composable("login") {
             val context = LocalContext.current
             val dataStoreManager = remember { DataStoreManager(context.applicationContext) }
@@ -74,27 +83,41 @@ private fun DisplayHubApp() {
                 }
             )
         }
+
         composable("home") {
             val view = LocalView.current
             val context = LocalContext.current
-            val dataStoreManager = remember { DataStoreManager(context.applicationContext) }
+            val appContext = context.applicationContext
+            val dataStoreManager = remember { DataStoreManager(appContext) }
+            val db = remember {
+                Room.databaseBuilder(appContext, AppDatabase::class.java, "idisplay_db")
+                    .build()
+            }
+            val downloadManager = remember { MediaDownloadManager(appContext) }
+            val scheduleRepository = remember(db, downloadManager, dataStoreManager) {
+                ScheduleRepository(Repository, db, downloadManager, dataStoreManager)
+            }
             val homeViewModel: HomeViewModel = viewModel(
-                factory = HomeViewModelFactory(Repository, dataStoreManager)
+                factory = HomeViewModelFactory(scheduleRepository)
             )
+
             DisposableEffect(Unit) {
                 val window = (view.context as? ComponentActivity)?.window
                     ?: return@DisposableEffect onDispose { }
+
                 WindowCompat.setDecorFitsSystemWindows(window, false)
                 val insetsController = WindowCompat.getInsetsController(window, view)
                 insetsController.hide(WindowInsetsCompat.Type.systemBars())
                 insetsController.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     window.attributes.layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
                 onDispose { }
             }
+
             HomeScreen(viewModel = homeViewModel)
         }
     }

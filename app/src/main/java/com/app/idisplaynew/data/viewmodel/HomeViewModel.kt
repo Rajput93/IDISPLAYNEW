@@ -3,17 +3,17 @@ package com.app.idisplaynew.data.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
-import com.app.idisplaynew.data.repository.Repository
-import com.app.idisplaynew.ui.utils.DataStoreManager
+import com.app.idisplaynew.data.repository.ScheduleRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-    private val repository: Repository,
-    private val dataStoreManager: DataStoreManager
+    private val scheduleRepository: ScheduleRepository
 ) : ViewModel() {
 
     private val _layout = MutableStateFlow<ScheduleCurrentResponse.ScheduleResult.Layout?>(null)
@@ -28,34 +28,49 @@ class HomeViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    fun loadSchedule() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                val baseUrl = dataStoreManager.baseUrl.first() ?: run {
-                    _error.value = "Base URL not found. Please login again."
+    private val _apiMessage = MutableStateFlow<String?>(null)
+    val apiMessage: StateFlow<String?> = _apiMessage.asStateFlow()
+
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    /** Path where downloaded images/videos are stored (e.g. for display). */
+    fun getMediaStoragePath(): String = scheduleRepository.getMediaStoragePath()
+
+    fun clearToast() {
+        _toastMessage.value = null
+    }
+
+    private var syncJob: Job? = null
+    private var collectJob: Job? = null
+
+    init {
+        collectJob = viewModelScope.launch {
+            scheduleRepository.getCurrentLayoutAndTickers()
+                .catch { _error.value = it.message }
+                .collect { (layout, tickers) ->
+                    _layout.value = layout
+                    _tickers.value = tickers
                     _isLoading.value = false
-                    return@launch
                 }
-                val token = dataStoreManager.authToken.first() ?: run {
-                    _error.value = "Token not found. Please login again."
-                    _isLoading.value = false
-                    return@launch
+        }
+        syncJob = viewModelScope.launch {
+            while (true) {
+                val result = scheduleRepository.syncFromApi()
+                if (result != null && (result.downloadedImages > 0 || result.downloadedVideos > 0)) {
+                    val parts = mutableListOf<String>()
+                    if (result.downloadedImages > 0) parts.add("${result.downloadedImages} image(s)")
+                    if (result.downloadedVideos > 0) parts.add("${result.downloadedVideos} video(s)")
+                    _toastMessage.value = "Downloaded: ${parts.joinToString(", ")}\nStorage: ${result.storagePath}"
                 }
-                val response = repository.getScheduleCurrent(baseUrl, token)
-                if (response.isSuccess && response.result?.layout != null) {
-                    _layout.value = response.result.layout
-                    _tickers.value = response.result.tickers
-                    _error.value = null
-                } else {
-                    _error.value = response.message.ifBlank { "Failed to load schedule" }
-                }
-            } catch (e: Exception) {
-                _error.value = "Error: ${e.message}"
-            } finally {
-                _isLoading.value = false
+                delay(1000)
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        syncJob?.cancel()
+        collectJob?.cancel()
     }
 }

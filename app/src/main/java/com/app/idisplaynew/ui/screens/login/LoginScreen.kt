@@ -106,7 +106,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Image(
-                painter = painterResource(R.drawable.ic_displayhub_logo),
+                painter = painterResource(R.drawable.ic_launcher),
                 contentDescription = null,
                 modifier = Modifier.size(responsive.logoSize),
                 contentScale = ContentScale.Fit

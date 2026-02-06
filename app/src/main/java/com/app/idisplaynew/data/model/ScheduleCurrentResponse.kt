@@ -13,8 +13,8 @@ data class ScheduleCurrentResponse(
     @Serializable
     data class ScheduleResult(
         @SerialName("scheduleId") val scheduleId: Int? = null,
-        @SerialName("layoutId") val layoutId: Int = 0,
-        @SerialName("layoutName") val layoutName: String = "",
+        @SerialName("layoutId") val layoutId: Int? = null,
+        @SerialName("layoutName") val layoutName: String? = null,
         @SerialName("startTime") val startTime: String? = null,
         @SerialName("endTime") val endTime: String? = null,
         @SerialName("priority") val priority: Int = 0,

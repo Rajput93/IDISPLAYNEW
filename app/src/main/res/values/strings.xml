@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">DisplayHub</string>
-    <string name="displayhub">DisplayHub</string>
+    <string name="displayhub">I-Display</string>
     <string name="sign_in">Sign In</string>
     <string name="sign_in_subtitle">Enter your credentials to continue</string>
     <string name="base_url">Base URL</string>

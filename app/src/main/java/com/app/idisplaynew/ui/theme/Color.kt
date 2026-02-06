@@ -11,7 +11,7 @@ val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
 // DisplayHub brand colors (design: #2F80ED blue, #F8F8F8 background)
-val DisplayHubBlue = Color(0xFF2F80ED)
+val DisplayHubBlue = Color(0xFF2E68B0)
 val DisplayHubBackground = Color(0xFFF8F8F8)
 val DisplayHubCardBackground = Color(0xFFFFFFFF)
 val DisplayHubTextPrimary = Color(0xFF1C1C1C)
