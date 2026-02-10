@@ -1,6 +1,7 @@
 package com.app.idisplaynew.data.local
 
 import android.content.Context
+import android.os.Environment
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -11,7 +12,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Downloads media (image/video) from URL and saves to app local storage.
+ * Downloads media (image/video) from URL and saves to app storage.
+ * Uses external files dir so the folder is visible on device (Android/data/<pkg>/files/schedule_media).
+ * Falls back to internal filesDir if external is not available.
  * Uses [fileName] so the same file is not re-downloaded (caller checks DB first).
  */
 class MediaDownloadManager(private val context: Context) {
@@ -21,7 +24,12 @@ class MediaDownloadManager(private val context: Context) {
     }
 
     private val mediaDir: File
-        get() = File(context.filesDir, MEDIA_DIR_NAME).also { if (!it.exists()) it.mkdirs() }
+        get() {
+            val baseDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                ?: context.getExternalFilesDir(null)
+                ?: context.filesDir
+            return File(baseDir, MEDIA_DIR_NAME).also { if (!it.exists()) it.mkdirs() }
+        }
 
     suspend fun downloadIfNeeded(url: String, fileName: String): String? = withContext(Dispatchers.IO) {
         if (url.isBlank() || fileName.isBlank()) return@withContext null
@@ -60,6 +68,28 @@ class MediaDownloadManager(private val context: Context) {
 
     /** Full path where downloaded images/videos are stored (e.g. for display in settings/toast). */
     fun getMediaStoragePath(): String = mediaDir.absolutePath
+
+    /** Legacy internal path (used to detect and migrate old downloads). */
+    fun getLegacyInternalMediaPath(): String = File(context.filesDir, MEDIA_DIR_NAME).absolutePath
+
+    /**
+     * Copy a file from legacy internal path to current (external) media dir.
+     * @return new absolute path, or null if copy failed or file already at current location.
+     */
+    suspend fun copyToCurrentStorage(fromPath: String, fileName: String): String? = withContext(Dispatchers.IO) {
+        if (fileName.isBlank()) return@withContext null
+        val src = File(fromPath)
+        if (!src.exists()) return@withContext null
+        val currentDir = mediaDir
+        if (fromPath.startsWith(currentDir.absolutePath)) return@withContext fromPath
+        val dest = File(currentDir, fileName)
+        try {
+            src.copyTo(dest, overwrite = true)
+            dest.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     companion object {
         const val MEDIA_DIR_NAME = "schedule_media"

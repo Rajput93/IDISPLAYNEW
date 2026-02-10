@@ -1,5 +1,6 @@
 package com.app.idisplaynew.ui.screens.home
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -27,10 +28,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun TickerStrip(
     ticker: ScheduleCurrentResponse.ScheduleResult.Ticker,
@@ -55,8 +56,9 @@ fun TickerStrip(
             var textWidthPx by remember { mutableStateOf(0f) }
             val containerWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
 
-            key(textWidthPx) {
-                val durationMs = (15000 / maxOf(1, ticker.speed)).toInt()
+            key(textWidthPx, ticker.speed) {
+                // Higher API speed = faster scroll (shorter duration), lower speed = slower scroll. Clamp 1s–120s.
+                val durationMs = (60000 / maxOf(1, ticker.speed)).toInt().coerceIn(1000, 120000)
                 val targetOffsetPx = if (textWidthPx > 0) -(textWidthPx + 100f) else containerWidthPx - 100f
                 val infiniteTransition = rememberInfiniteTransition(label = "ticker")
                 val offsetPx by infiniteTransition.animateFloat(

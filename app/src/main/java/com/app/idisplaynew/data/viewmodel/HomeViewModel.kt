@@ -34,7 +34,10 @@ class HomeViewModel(
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
-    /** Path where downloaded images/videos are stored (e.g. for display). */
+    private val _mediaStoragePath = MutableStateFlow("")
+    val mediaStoragePath: StateFlow<String> = _mediaStoragePath.asStateFlow()
+
+    /** Path where downloaded images/videos are stored (visible on device). */
     fun getMediaStoragePath(): String = scheduleRepository.getMediaStoragePath()
 
     fun clearToast() {

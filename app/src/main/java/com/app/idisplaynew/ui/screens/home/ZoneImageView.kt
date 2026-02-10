@@ -21,7 +21,7 @@ fun ZoneImageView(
             model = imageUrl,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit
         )
         LaunchedEffect(imageUrl, durationSeconds) {
             val durationMs = (durationSeconds.coerceAtLeast(1)) * 1000L

@@ -1,8 +1,10 @@
 package com.app.idisplaynew.data.model
 
+import android.annotation.SuppressLint
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ScheduleCurrentResponse(
     @SerialName("isSuccess") val isSuccess: Boolean = false,
@@ -26,7 +28,7 @@ data class ScheduleCurrentResponse(
         data class Ticker(
             @SerialName("id") val id: Int = 0,
             @SerialName("text") val text: String = "",
-            @SerialName("speed") val speed: Int = 5,
+            @SerialName("speed") val speed: Int,
             @SerialName("fontSize") val fontSize: Int = 24,
             @SerialName("textColor") val textColor: String = "#000000",
             @SerialName("backgroundColor") val backgroundColor: String = "#ffffff",
@@ -61,9 +63,13 @@ data class ScheduleCurrentResponse(
                     @SerialName("type") val type: String = "video",
                     @SerialName("url") val url: String = "",
                     @SerialName("fileName") val fileName: String = "",
+                    @SerialName("originalFileName") val originalFileName: String? = null,
                     @SerialName("duration") val duration: Int = 0,
                     @SerialName("fileSizeBytes") val fileSizeBytes: Long = 0L,
-                    @SerialName("checksum") val checksum: String? = null
+                    @SerialName("checksum") val checksum: String? = null,
+                    @SerialName("htmlContent") val htmlContent: String? = null,
+                    @SerialName("sourceUrl") val sourceUrl: String? = null,
+                    @SerialName("refreshInterval") val refreshInterval: Int? = null
                 )
             }
         }

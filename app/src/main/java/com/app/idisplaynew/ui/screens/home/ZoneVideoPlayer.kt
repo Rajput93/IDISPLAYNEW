@@ -4,13 +4,17 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -18,6 +22,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
+@UnstableApi
 @Composable
 fun ZoneVideoPlayer(
     videoUrl: String,
@@ -27,7 +32,7 @@ fun ZoneVideoPlayer(
 ) {
     val context = LocalContext.current
 
-    val exoPlayer = remember(playerKey, videoUrl) {
+    val exoPlayer = remember(playerKey) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
@@ -36,29 +41,35 @@ fun ZoneVideoPlayer(
             .setMediaSourceFactory(mediaSourceFactory)
             .build()
             .apply {
-                setMediaItem(MediaItem.fromUri(videoUrl))
                 playWhenReady = true
-                repeatMode = if (onPlaybackEnded != null) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ALL
             }
     }
 
-    DisposableEffect(videoUrl, onPlaybackEnded, playerKey) {
-        exoPlayer.repeatMode = if (onPlaybackEnded != null) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ALL
+    val currentOnPlaybackEnded = rememberUpdatedState(onPlaybackEnded)
+    SideEffect {
+        exoPlayer.repeatMode = if (currentOnPlaybackEnded.value != null) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ALL
+    }
+    LaunchedEffect(videoUrl) {
+        exoPlayer.setMediaItem(MediaItem.fromUri(videoUrl))
+        exoPlayer.prepare()
+        exoPlayer.play()
+    }
+    DisposableEffect(playerKey) {
+        val callbackState = currentOnPlaybackEnded
+        exoPlayer.repeatMode = if (callbackState.value != null) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ALL
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> exoPlayer.play()
-                    Player.STATE_ENDED -> onPlaybackEnded?.invoke()
+                    Player.STATE_ENDED -> callbackState.value?.invoke()
                 }
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                onPlaybackEnded?.invoke()
+                callbackState.value?.invoke()
             }
         }
         exoPlayer.addListener(listener)
-        exoPlayer.prepare()
-
         onDispose {
             exoPlayer.removeListener(listener)
             exoPlayer.release()

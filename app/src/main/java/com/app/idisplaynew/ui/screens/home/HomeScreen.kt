@@ -23,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
@@ -40,6 +42,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
+    val mediaStoragePath by viewModel.mediaStoragePath.collectAsState()
 
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
@@ -100,6 +103,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 modifier = Modifier
                                     .offset(leftDp, topDp)
                                     .size(widthDp, heightDp)
+                                    .clip(RectangleShape)
                                     .background(parseHexColor(zone.backgroundColor))
                                     .border(2.dp, Color.White)
                             ) {
@@ -125,6 +129,17 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     }
                 }
             }
+           /* if (mediaStoragePath.isNotEmpty()) {
+                Text(
+                    text = "Media: $mediaStoragePath",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                        .fillMaxWidth(0.6f)
+                )
+            }*/
         } else {
             // No layout: show API message and any tickers
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -179,6 +194,17 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         }
                     }
                 }
+            /*    if (mediaStoragePath.isNotEmpty()) {
+                    Text(
+                        text = "Media: $mediaStoragePath",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(8.dp)
+                            .fillMaxWidth(0.85f)
+                    )
+                }*/
             }
         }
     }

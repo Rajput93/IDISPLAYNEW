@@ -32,6 +32,9 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_file WHERE scheduleId = :scheduleId")
     suspend fun getAllByScheduleId(scheduleId: Int): List<MediaFileEntity>
 
+    @Query("SELECT * FROM media_file")
+    suspend fun getAll(): List<MediaFileEntity>
+
     @Query("SELECT * FROM media_file WHERE scheduleId = :scheduleId")
     fun getAllByScheduleIdFlow(scheduleId: Int): Flow<List<MediaFileEntity>>
 }

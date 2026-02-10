@@ -106,7 +106,12 @@ class ScheduleRepository(
         val zonesWithLocalUrls = layout.zones.map { zone ->
             zone.copy(playlist = zone.playlist.map { item ->
                 val localPath = item.fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
-                val displayUrl = if (localPath != null) "file://$localPath" else item.url
+                val isVideoOrImage = item.type.equals("video", ignoreCase = true) || item.type.equals("image", ignoreCase = true)
+                val displayUrl = when {
+                    localPath != null -> "file://$localPath"
+                    isVideoOrImage -> "" // show only when downloaded
+                    else -> item.url
+                }
                 item.copy(url = displayUrl)
             })
         }
@@ -125,11 +130,30 @@ class ScheduleRepository(
     fun getMediaStoragePath(): String = downloadManager.getMediaStoragePath()
 
     /**
+     * Moves files from legacy internal path to current (external) storage and updates DB.
+     * Call once per app/sync so the displayed path contains all downloaded files.
+     */
+    suspend fun migrateMediaToExternalStorage(): Int = withContext(Dispatchers.IO) {
+        val legacyPath = downloadManager.getLegacyInternalMediaPath()
+        val all = mediaDao.getAll()
+        var count = 0
+        all.forEach { media ->
+            val path = media.localPath ?: return@forEach
+            if (!path.startsWith(legacyPath)) return@forEach
+            val newPath = downloadManager.copyToCurrentStorage(path, media.fileName) ?: return@forEach
+            mediaDao.insert(media.copy(localPath = newPath))
+            count++
+        }
+        count
+    }
+
+    /**
      * Call this every 1 second. Fetches from API; if data changed, updates local DB,
      * downloads new media (skips if fileName already present), deletes expired and removed.
      * @return SyncResult with download counts and storage path (for toast); null if no sync or error.
      */
     suspend fun syncFromApi(): SyncResult? {
+        migrateMediaToExternalStorage()
         val baseUrl = dataStore.baseUrl.first() ?: return null
         val token = dataStore.authToken.first() ?: return null
 
