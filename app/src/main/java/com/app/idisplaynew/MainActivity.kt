@@ -53,21 +53,26 @@ private fun DisplayHubApp() {
     val navController = rememberNavController()
     NavHost(
         navController = navController,
-        startDestination = "login"
+        startDestination = "splash"
     ) {
-
-        // Splash screen temporarily disabled
-        /*
         composable("splash") {
+            val context = LocalContext.current
+            val dataStoreManager = remember { DataStoreManager(context.applicationContext) }
             SplashScreen(
-                onSplashFinished = {
-                    navController.navigate("login") {
-                        popUpTo("splash") { inclusive = true }
+                dataStoreManager = dataStoreManager,
+                onSplashFinished = { isLoggedIn ->
+                    if (isLoggedIn) {
+                        navController.navigate("home") {
+                            popUpTo("splash") { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate("login") {
+                            popUpTo("splash") { inclusive = true }
+                        }
                     }
                 }
             )
         }
-        */
 
         composable("login") {
             val context = LocalContext.current
@@ -77,6 +82,7 @@ private fun DisplayHubApp() {
             )
             LoginScreen(
                 viewModel = viewModel,
+                dataStoreManager = dataStoreManager,
                 onLoginSuccess = {
                     navController.navigate("home") {
                         popUpTo("login") { inclusive = true }

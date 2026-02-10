@@ -46,6 +46,8 @@ class ScheduleRepository(
 
     /** Emitted after sync so display flow re-queries. */
     private val refreshTrigger = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    /** Incremented after every sync so layout flow always re-reads (zone add/delete updates UI). */
+    private val layoutRefreshCount = MutableStateFlow(0)
 
     /** Tickers from API only – not saved in DB; updated on every sync, display directly. */
     private val _tickersFromApi = MutableStateFlow<List<ScheduleCurrentResponse.ScheduleResult.Ticker>>(emptyList())
@@ -75,7 +77,8 @@ class ScheduleRepository(
                     emit(nowIso())
                 }
             },
-            refreshTrigger.map { nowIso() }
+            refreshTrigger.map { nowIso() },
+            layoutRefreshCount.map { nowIso() }
         )
             .flatMapLatest { now -> scheduleDao.getCurrentSchedule(now) }
             .flatMapLatest { entity ->
@@ -188,6 +191,7 @@ class ScheduleRepository(
                 scheduleDao.delete(schedule)
             }
             refreshTrigger.tryEmit(Unit)
+            layoutRefreshCount.value += 1
             return null
         }
 
@@ -202,6 +206,7 @@ class ScheduleRepository(
             scheduleDao.getByScheduleId(scheduleId)?.let { scheduleDao.delete(it) }
             mediaDao.deleteByScheduleId(scheduleId)
             refreshTrigger.tryEmit(Unit)
+            layoutRefreshCount.value += 1
             return null
         }
 
@@ -219,6 +224,7 @@ class ScheduleRepository(
         )
         scheduleDao.insert(entity)
         refreshTrigger.tryEmit(Unit)
+        layoutRefreshCount.value += 1
 
         // 3) Sync media: for each playlist item, ensure file exists (download if not); count new downloads
         var downloadedImages = 0

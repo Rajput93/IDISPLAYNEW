@@ -18,6 +18,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -27,12 +30,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.app.idisplaynew.R
 import com.app.idisplaynew.ui.theme.DisplayHubBackground
+import com.app.idisplaynew.ui.utils.DataStoreManager
 
 @Composable
 fun SplashScreen(
-    onSplashFinished: () -> Unit
+    dataStoreManager: DataStoreManager,
+    onSplashFinished: (isLoggedIn: Boolean) -> Unit
 ) {
     var startAnimation by remember { mutableStateOf(false) }
+    var isLoggedIn by remember { mutableStateOf<Boolean?>(null) }
     val alpha by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
         animationSpec = tween(durationMillis = 800),
@@ -41,12 +47,17 @@ fun SplashScreen(
 
     LaunchedEffect(Unit) {
         startAnimation = true
+        isLoggedIn = withContext(Dispatchers.IO) {
+            val token = dataStoreManager.authToken.first()
+            val baseUrl = dataStoreManager.baseUrl.first()
+            !token.isNullOrBlank() && !baseUrl.isNullOrBlank()
+        }
     }
 
-    LaunchedEffect(alpha) {
-        if (alpha >= 0.99f) {
+    LaunchedEffect(alpha, isLoggedIn) {
+        if (alpha >= 0.99f && isLoggedIn != null) {
             kotlinx.coroutines.delay(1200)
-            onSplashFinished()
+            onSplashFinished(isLoggedIn!!)
         }
     }
 

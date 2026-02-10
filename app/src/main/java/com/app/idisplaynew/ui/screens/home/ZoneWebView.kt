@@ -16,8 +16,16 @@ import kotlinx.coroutines.delay
 
 private fun wrapHtmlForZone(htmlContent: String): String {
     val viewport = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\"/>"
-    val bodyStyle = "margin:0;padding:0;width:100%;height:100%;min-height:100%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;"
-    return "<!DOCTYPE html><html style=\"height:100%;margin:0\"><head>$viewport</head><body style=\"$bodyStyle\">$htmlContent</body></html>"
+    val fullLayoutStyle = """
+        <style>
+            html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+            #zone-root { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; margin: 0; padding: 0; }
+            #zone-root > * { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 100% !important; margin: 0 !important; box-sizing: border-box !important; display: block !important; overflow: auto !important; }
+        </style>
+    """.trimIndent()
+    val bodyStyle = "margin:0;padding:0;width:100%;height:100%;"
+    val wrappedContent = "<div id=\"zone-root\">${htmlContent.trim()}</div>"
+    return "<!DOCTYPE html><html style=\"height:100%;margin:0\"><head>$viewport$fullLayoutStyle</head><body style=\"$bodyStyle\">$wrappedContent</body></html>"
 }
 
 @SuppressLint("SetJavaScriptEnabled")

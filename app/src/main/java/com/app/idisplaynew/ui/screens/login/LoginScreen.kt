@@ -39,7 +39,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -56,11 +60,14 @@ import com.app.idisplaynew.ui.theme.DisplayHubBorder
 import com.app.idisplaynew.ui.theme.DisplayHubCardBackground
 import com.app.idisplaynew.ui.theme.DisplayHubPlaceholder
 import com.app.idisplaynew.ui.theme.DisplayHubTextSecondary
+import com.app.idisplaynew.ui.utils.DataStoreManager
+import com.app.idisplaynew.ui.utils.isNetworkAvailable
 import com.app.idisplaynew.ui.utils.rememberResponsiveValues
 
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
+    dataStoreManager: DataStoreManager,
     onLoginSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -70,6 +77,17 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val responsive = rememberResponsiveValues()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // If already logged in (token + baseUrl saved), go to home without showing form
+    LaunchedEffect(dataStoreManager) {
+        val token = dataStoreManager.authToken.first()
+        val baseUrl = dataStoreManager.baseUrl.first()
+        if (!token.isNullOrBlank() && !baseUrl.isNullOrBlank()) {
+            onLoginSuccess()
+        }
+    }
 
     LaunchedEffect(registerResponse) {
         registerResponse?.let { response ->
@@ -232,7 +250,18 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
-                        onClick = { viewModel.register() },
+                        onClick = {
+                            scope.launch {
+                                if (!context.isNetworkAvailable()) {
+                                    snackbarHostState.showSnackbar(
+                                        message = "No internet. Please check your connection.",
+                                        withDismissAction = true
+                                    )
+                                    return@launch
+                                }
+                                viewModel.register()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(responsive.buttonHeight),
