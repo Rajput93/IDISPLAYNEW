@@ -89,7 +89,7 @@ fun ZoneVideoPlayer(
             PlayerView(ctx).apply {
                 player = exoPlayer
                 useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
