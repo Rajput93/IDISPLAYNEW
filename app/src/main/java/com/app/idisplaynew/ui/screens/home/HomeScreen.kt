@@ -9,11 +9,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,14 +26,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.app.idisplaynew.R
 import com.app.idisplaynew.data.viewmodel.HomeViewModel
+import com.app.idisplaynew.ui.theme.DisplayHubCardBackground
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
@@ -129,45 +137,17 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     }
                 }
             }
-           /* if (mediaStoragePath.isNotEmpty()) {
-                Text(
-                    text = "Media: $mediaStoragePath",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .fillMaxWidth(0.6f)
-                )
-            }*/
+
         } else {
-            // No layout: show API message and any tickers
+            // No layout / API not run: default 4-zone screen with app logo in each zone
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val density = LocalDensity.current.density
                 val scaleY = with(LocalDensity.current) { maxHeight.toPx() } / 1080f
-
-                if (!apiMessage.isNullOrBlank()) {
-                    Text(
-                        text = apiMessage!!,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                    )
-                }
-
                 val topTickers = tickers.filter { it.position.equals("top", ignoreCase = true) }.sortedBy { it.priority }
                 val bottomTickers = tickers.filter { it.position.equals("bottom", ignoreCase = true) }.sortedBy { it.priority }
 
-                if (topTickers.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                    ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    if (topTickers.isNotEmpty()) {
                         topTickers.forEach { ticker ->
                             val heightDp = (ticker.height * scaleY / density).dp
                             TickerStrip(
@@ -177,13 +157,24 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             )
                         }
                     }
-                }
-                if (bottomTickers.isNotEmpty()) {
+
+                    // Default 4 zones (2x2) with app logo
                     Column(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
+                            .weight(1f)
                     ) {
+                        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            DefaultZoneWithLogo(modifier = Modifier.weight(1f).fillMaxHeight())
+                            DefaultZoneWithLogo(modifier = Modifier.weight(1f).fillMaxHeight())
+                        }
+                        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            DefaultZoneWithLogo(modifier = Modifier.weight(1f).fillMaxHeight())
+                            DefaultZoneWithLogo(modifier = Modifier.weight(1f).fillMaxHeight())
+                        }
+                    }
+
+                    if (bottomTickers.isNotEmpty()) {
                         bottomTickers.forEach { ticker ->
                             val heightDp = (ticker.height * scaleY / density).dp
                             TickerStrip(
@@ -194,19 +185,28 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         }
                     }
                 }
-            /*    if (mediaStoragePath.isNotEmpty()) {
-                    Text(
-                        text = "Media: $mediaStoragePath",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp)
-                            .fillMaxWidth(0.85f)
-                    )
-                }*/
             }
         }
+    }
+}
+
+@Composable
+private fun DefaultZoneWithLogo(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(4.dp)
+            .clip(RectangleShape)
+            .background(DisplayHubCardBackground)
+            .border(2.dp, Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_launcher),
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 

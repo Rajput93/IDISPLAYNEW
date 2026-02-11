@@ -6,6 +6,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpRedirect
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,6 +22,11 @@ class MediaDownloadManager(private val context: Context) {
 
     private val httpClient = HttpClient(CIO) {
         install(HttpRedirect)
+        install(HttpTimeout) {
+            requestTimeoutMillis = 5 * 60_000L   // 5 min for large video
+            connectTimeoutMillis = 30_000L
+            socketTimeoutMillis = 5 * 60_000L
+        }
     }
 
     private val mediaDir: File

@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
+import android.net.Uri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,7 +51,13 @@ fun ZoneVideoPlayer(
         exoPlayer.repeatMode = if (currentOnPlaybackEnded.value != null) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ALL
     }
     LaunchedEffect(videoUrl) {
-        exoPlayer.setMediaItem(MediaItem.fromUri(videoUrl))
+        if (videoUrl.isBlank()) return@LaunchedEffect
+        val uri = when {
+            videoUrl.startsWith("file://") -> Uri.parse(videoUrl)
+            videoUrl.startsWith("/") -> Uri.parse("file://$videoUrl")
+            else -> Uri.parse(videoUrl)
+        }
+        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
         exoPlayer.prepare()
         exoPlayer.play()
     }
@@ -82,7 +89,7 @@ fun ZoneVideoPlayer(
             PlayerView(ctx).apply {
                 player = exoPlayer
                 useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT

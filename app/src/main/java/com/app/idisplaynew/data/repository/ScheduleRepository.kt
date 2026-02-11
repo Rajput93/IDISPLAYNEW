@@ -103,12 +103,17 @@ class ScheduleRepository(
         layout: ScheduleCurrentResponse.ScheduleResult.Layout,
         mediaList: List<MediaFileEntity>
     ): ScheduleCurrentResponse.ScheduleResult.Layout {
+        // Map (zoneId, mediaId) -> local path so we can show video/image even when API sends blank fileName
+        val localPathByZoneAndMedia = mediaList
+            .filter { it.localPath != null && downloadManager.isFilePresent(it.localPath!!) }
+            .associate { (it.zoneId to it.mediaId) to it.localPath!! }
         val urlByFileName = mediaList
             .filter { it.localPath != null && downloadManager.isFilePresent(it.localPath!!) }
             .associate { it.fileName to it.localPath!! }
         val zonesWithLocalUrls = layout.zones.map { zone ->
             zone.copy(playlist = zone.playlist.map { item ->
-                val localPath = item.fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
+                val localPath = localPathByZoneAndMedia[zone.zoneId to item.mediaId]
+                    ?: item.fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
                 val isVideoOrImage = item.type.equals("video", ignoreCase = true) || item.type.equals("image", ignoreCase = true)
                 val displayUrl = when {
                     localPath != null -> "file://$localPath"
@@ -127,6 +132,25 @@ class ScheduleRepository(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Derive a unique fileName when API sends blank (so we can still download and look up by zoneId+mediaId). */
+    private fun deriveFileNameFromUrl(url: String, zoneId: Int, mediaId: Int, type: String): String {
+        val fromUrl = url.substringAfterLast('/').substringBefore('?').trim()
+        val ext = when {
+            fromUrl.contains(".") -> fromUrl.substringAfterLast('.', "").take(4)
+            type.equals("video", ignoreCase = true) -> "mp4"
+            type.equals("image", ignoreCase = true) -> "jpg"
+            else -> "bin"
+        }
+        return "media_${zoneId}_${mediaId}.${if (ext.isNotBlank()) ext else "mp4"}"
+    }
+
+    /** Resolve relative media URL (e.g. /uploads/video.mp4) to absolute using API baseUrl. */
+    private fun resolveMediaUrl(baseUrl: String, url: String): String {
+        if (url.isBlank()) return url
+        if (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)) return url
+        return if (url.startsWith("/")) "$baseUrl$url" else "$baseUrl/$url"
     }
 
     /** Full path where downloaded images/videos are stored. */
@@ -227,25 +251,30 @@ class ScheduleRepository(
         layoutRefreshCount.value += 1
 
         // 3) Sync media: for each playlist item, ensure file exists (download if not); count new downloads
+        // API often returns relative URLs (e.g. /uploads/video.mp4) – resolve with baseUrl for download
+        val normalizedBaseUrl = baseUrl.trimEnd('/')
         var downloadedImages = 0
         var downloadedVideos = 0
         val currentFileNames = mutableSetOf<String>()
         layout.zones.forEach { zone ->
             zone.playlist.forEach { item ->
-                if (item.fileName.isNotBlank() && item.url.isNotBlank()) {
-                    currentFileNames.add(item.fileName)
-                    val existing = mediaDao.getByFileName(item.fileName)
+                if (item.url.isNotBlank()) {
+                    val downloadUrl = resolveMediaUrl(normalizedBaseUrl, item.url)
+                    val effectiveFileName = item.fileName.takeIf { it.isNotBlank() }
+                        ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
+                    currentFileNames.add(effectiveFileName)
+                    val existing = mediaDao.getByFileName(effectiveFileName)
                     val hadLocal = existing?.localPath != null && downloadManager.isFilePresent(existing.localPath)
                     val localPath = when {
                         hadLocal -> existing!!.localPath
-                        else -> downloadManager.downloadIfNeeded(item.url, item.fileName)
+                        else -> downloadManager.downloadIfNeeded(downloadUrl, effectiveFileName)
                     }
                     if (localPath != null && !hadLocal) {
                         if (item.type.equals("video", ignoreCase = true)) downloadedVideos++
                         else downloadedImages++
                     }
                     val mediaEntity = MediaFileEntity(
-                        fileName = item.fileName,
+                        fileName = effectiveFileName,
                         localPath = localPath,
                         url = item.url,
                         scheduleId = scheduleId,

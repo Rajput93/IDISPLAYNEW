@@ -1,5 +1,6 @@
 package com.app.idisplaynew.ui.screens.home
 
+import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.media3.common.util.UnstableApi
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 import kotlinx.coroutines.delay
 
@@ -33,6 +35,7 @@ private fun isDisplayable(item: ScheduleCurrentResponse.ScheduleResult.Layout.Zo
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 fun ZonePlaylistContent(
     zoneId: Int,
