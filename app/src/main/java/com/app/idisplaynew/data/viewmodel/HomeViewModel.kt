@@ -57,16 +57,18 @@ class HomeViewModel(
                     _isLoading.value = false
                 }
         }
+        // Poll API at interval; repo only updates DB and triggers refresh when layoutId/lastUpdated changed
         syncJob = viewModelScope.launch {
             while (true) {
                 val result = scheduleRepository.syncFromApi()
-                if (result != null && (result.downloadedImages > 0 || result.downloadedVideos > 0)) {
-                    val parts = mutableListOf<String>()
-                    if (result.downloadedImages > 0) parts.add("${result.downloadedImages} image(s)")
-                    if (result.downloadedVideos > 0) parts.add("${result.downloadedVideos} video(s)")
-                    _toastMessage.value = "Downloaded: ${parts.joinToString(", ")}\nStorage: ${result.storagePath}"
-                }
-                delay(1000)
+                // Toast when video/image downloaded – commented out
+                // if (result != null && (result.downloadedImages > 0 || result.downloadedVideos > 0)) {
+                //     val parts = mutableListOf<String>()
+                //     if (result.downloadedImages > 0) parts.add("${result.downloadedImages} image(s)")
+                //     if (result.downloadedVideos > 0) parts.add("${result.downloadedVideos} video(s)")
+                //     _toastMessage.value = "Downloaded: ${parts.joinToString(", ")}\nStorage: ${result.storagePath}"
+                // }
+                delay(5_000) // 5 sec – poll API; DB/UI updates when layout from API changes
             }
         }
     }

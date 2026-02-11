@@ -224,9 +224,8 @@ class ScheduleRepository(
         val layout = result.layout
         val tickersFromResponse = result.tickers ?: emptyList()
 
-        _tickersFromApi.value = tickersFromResponse
-
         if (layout == null) {
+            _tickersFromApi.value = tickersFromResponse
             scheduleDao.getByScheduleId(scheduleId)?.let { scheduleDao.delete(it) }
             mediaDao.deleteByScheduleId(scheduleId)
             refreshTrigger.tryEmit(Unit)
@@ -234,7 +233,27 @@ class ScheduleRepository(
             return null
         }
 
+        val apiZoneIds = layout.zones.map { it.zoneId }.toSet()
+        val current = scheduleDao.getByScheduleId(scheduleId)
+        val currentLayout = current?.let { entityToLayout(it) }
+        val currentZoneIds = currentLayout?.zones?.map { it.zoneId }?.toSet() ?: emptySet()
+
+        // Only update when zoneIds or layoutId or lastUpdated changed – no API apply, no flicker
+        if (current != null && currentZoneIds == apiZoneIds &&
+            current.layoutId == result.layoutId && current.lastUpdated == result.lastUpdated) {
+            return null
+        }
+
+        _tickersFromApi.value = tickersFromResponse
         val layoutJson = json.encodeToString(layout)
+
+        // Remove zones no longer in API: delete their media rows and files
+        val existingMedia = mediaDao.getAllByScheduleId(scheduleId)
+        existingMedia.filter { it.zoneId !in apiZoneIds }.forEach { media ->
+            downloadManager.deleteFileByPath(media.localPath)
+            mediaDao.delete(media)
+        }
+
         val entity = ScheduleEntity(
             scheduleId = scheduleId,
             layoutId = result.layoutId,
