@@ -27,7 +27,7 @@ private fun isDisplayable(item: ScheduleCurrentResponse.ScheduleResult.Layout.Zo
     return when (item.type.equals("video", ignoreCase = true)) {
         true -> item.url.isNotBlank()
         false -> when (item.type.lowercase()) {
-            "image" -> item.url.isNotBlank()
+            "image", "document" -> item.url.isNotBlank()
             "notice", "event", "motivational", "weather", "url" ->
                 !item.htmlContent.isNullOrBlank() || !item.sourceUrl.isNullOrBlank()
             else -> item.url.isNotBlank()
@@ -110,6 +110,15 @@ fun ZonePlaylistContent(
             "notice", "event", "motivational", "weather", "url" -> ZoneWebView(
                 htmlContent = item.htmlContent,
                 sourceUrl = item.sourceUrl,
+                durationSeconds = item.duration.coerceAtLeast(1),
+                modifier = Modifier.fillMaxSize(),
+                onDurationReached = {
+                    currentIndex = (displayIndex + 1) % playlist.size
+                }
+            )
+            "document" -> ZoneDocumentView(
+                documentUrl = item.url,
+                fileName = item.fileName,
                 durationSeconds = item.duration.coerceAtLeast(1),
                 modifier = Modifier.fillMaxSize(),
                 onDurationReached = {

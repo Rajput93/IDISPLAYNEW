@@ -33,9 +33,9 @@ object Repository {
         }
         install(HttpRedirect)
         install(HttpTimeout) {
-            requestTimeoutMillis = 30_000L
-            connectTimeoutMillis = 15_000L
-            socketTimeoutMillis = 30_000L
+            requestTimeoutMillis = 60_000L
+            connectTimeoutMillis = 60_000L
+            socketTimeoutMillis = 60_000L
         }
     }
 
@@ -58,6 +58,11 @@ object Repository {
         val url = buildUrl(baseUrl, ApiEndpoints.SCHEDULE_CURRENT)
         return httpClient.get(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
+            timeout {
+                connectTimeoutMillis = 60_000
+                requestTimeoutMillis = 60_000
+                socketTimeoutMillis = 60_000
+            }
         }.body()
     }
 
@@ -66,9 +71,9 @@ object Repository {
         return httpClient.get(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
             timeout {
-                connectTimeoutMillis = 30_000
-                requestTimeoutMillis = 45_000
-                socketTimeoutMillis = 45_000
+                connectTimeoutMillis = 60_000
+                requestTimeoutMillis = 60_000
+                socketTimeoutMillis = 60_000
             }
         }.body()
     }
@@ -80,9 +85,9 @@ object Repository {
             contentType(ContentType.Application.Json)
             setBody(payload)
             timeout {
-                connectTimeoutMillis = 30_000
-                requestTimeoutMillis = 45_000
-                socketTimeoutMillis = 45_000
+                connectTimeoutMillis = 60_000
+                requestTimeoutMillis = 60_000
+                socketTimeoutMillis = 60_000
             }
         }
     }

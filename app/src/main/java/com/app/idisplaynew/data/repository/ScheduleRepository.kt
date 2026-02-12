@@ -117,10 +117,21 @@ class ScheduleRepository(
                 val localPath = localPathByZoneAndMedia[zone.zoneId to item.mediaId]
                     ?: item.fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
                 val isVideoOrImage = item.type.equals("video", ignoreCase = true) || item.type.equals("image", ignoreCase = true)
+                val isDocument = item.type.equals("document", ignoreCase = true)
+                val isPdf = item.fileName.endsWith(".pdf", true) || item.url.contains(".pdf", true)
                 val displayUrl = when {
-                    localPath != null -> "file://$localPath"
-                    isVideoOrImage -> "" // show only when downloaded
-                    else -> item.url
+                    isDocument -> when {
+                        localPath != null && isPdf -> "file://$localPath"
+                        else -> item.url
+                    }
+                    isVideoOrImage -> when {
+                        localPath != null -> "file://$localPath"
+                        else -> ""
+                    }
+                    else -> when {
+                        localPath != null -> "file://$localPath"
+                        else -> item.url
+                    }
                 }
                 item.copy(url = displayUrl)
             })
