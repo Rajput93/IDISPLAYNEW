@@ -4,6 +4,8 @@ import com.app.idisplaynew.data.local.AppDatabase
 import com.app.idisplaynew.data.local.MediaDownloadManager
 import com.app.idisplaynew.data.local.entity.MediaFileEntity
 import com.app.idisplaynew.data.local.entity.ScheduleEntity
+import com.app.idisplaynew.data.model.AckCommandPayload
+import com.app.idisplaynew.data.model.DeviceCommandsResponse
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 import com.app.idisplaynew.ui.utils.DataStoreManager
 import kotlinx.coroutines.Dispatchers
@@ -157,6 +159,31 @@ class ScheduleRepository(
     fun getMediaStoragePath(): String = downloadManager.getMediaStoragePath()
 
     /**
+     * Fetches device commands. Only when commandType == "refresh" we hit ack API;
+     * after ack response is received, we hit player/schedule/current.
+     */
+    suspend fun fetchAndProcessCommands(): Unit = withContext(Dispatchers.IO) {
+        val baseUrl = dataStore.baseUrl.first() ?: return@withContext
+        val token = dataStore.authToken.first() ?: return@withContext
+        val response = try {
+            api.getDeviceCommands(baseUrl, token)
+        } catch (_: Exception) {
+            return@withContext
+        }
+        val refreshCommands = response.result?.commands
+            ?.filter { it.commandType.equals("refresh", ignoreCase = true) }
+            ?: emptyList()
+        if (refreshCommands.isEmpty()) return@withContext
+        for (command in refreshCommands) {
+            try {
+                api.ackCommand(baseUrl, token, AckCommandPayload(commandId = command.commandId, status = "success", result = ""))
+            }
+            catch (_: Exception) { }
+        }
+        syncFromApi()
+    }
+
+    /**
      * Moves files from legacy internal path to current (external) storage and updates DB.
      * Call once per app/sync so the displayed path contains all downloaded files.
      */
@@ -226,8 +253,14 @@ class ScheduleRepository(
 
         if (layout == null) {
             _tickersFromApi.value = tickersFromResponse
-            scheduleDao.getByScheduleId(scheduleId)?.let { scheduleDao.delete(it) }
-            mediaDao.deleteByScheduleId(scheduleId)
+            // API returned no layout: clear all schedule data so only API data is shown (default 4 zones)
+            scheduleDao.getAll().forEach { schedule ->
+                mediaDao.getAllByScheduleId(schedule.scheduleId).forEach { media ->
+                    downloadManager.deleteFileByPath(media.localPath)
+                    mediaDao.delete(media)
+                }
+                scheduleDao.delete(schedule)
+            }
             refreshTrigger.tryEmit(Unit)
             layoutRefreshCount.value += 1
             return null

@@ -45,6 +45,7 @@ class HomeViewModel(
     }
 
     private var syncJob: Job? = null
+    private var commandsJob: Job? = null
     private var collectJob: Job? = null
 
     init {
@@ -57,18 +58,18 @@ class HomeViewModel(
                     _isLoading.value = false
                 }
         }
-        // Poll API at interval; repo only updates DB and triggers refresh when layoutId/lastUpdated changed
+        // Poll schedule API every 5 sec
         syncJob = viewModelScope.launch {
             while (true) {
-                val result = scheduleRepository.syncFromApi()
-                // Toast when video/image downloaded – commented out
-                // if (result != null && (result.downloadedImages > 0 || result.downloadedVideos > 0)) {
-                //     val parts = mutableListOf<String>()
-                //     if (result.downloadedImages > 0) parts.add("${result.downloadedImages} image(s)")
-                //     if (result.downloadedVideos > 0) parts.add("${result.downloadedVideos} video(s)")
-                //     _toastMessage.value = "Downloaded: ${parts.joinToString(", ")}\nStorage: ${result.storagePath}"
-                // }
-                delay(5_000) // 5 sec – poll API; DB/UI updates when layout from API changes
+                scheduleRepository.syncFromApi()
+                delay(5_000)
+            }
+        }
+        // Poll device commands every 10 sec; if commands not empty, ack each then trigger schedule sync
+        commandsJob = viewModelScope.launch {
+            while (true) {
+                scheduleRepository.fetchAndProcessCommands()
+                delay(10_000)
             }
         }
     }
@@ -76,6 +77,7 @@ class HomeViewModel(
     override fun onCleared() {
         super.onCleared()
         syncJob?.cancel()
+        commandsJob?.cancel()
         collectJob?.cancel()
     }
 }

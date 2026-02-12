@@ -1,5 +1,7 @@
 package com.app.idisplaynew.data.repository
 
+import com.app.idisplaynew.data.model.AckCommandPayload
+import com.app.idisplaynew.data.model.DeviceCommandsResponse
 import com.app.idisplaynew.data.model.LoginPayload
 import com.app.idisplaynew.data.model.LoginResponse
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
@@ -14,6 +16,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.plugins.timeout
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.HttpHeaders
@@ -56,5 +59,31 @@ object Repository {
         return httpClient.get(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
         }.body()
+    }
+
+    suspend fun getDeviceCommands(baseUrl: String, token: String): DeviceCommandsResponse {
+        val url = buildUrl(baseUrl, ApiEndpoints.DEVICE_COMMANDS)
+        return httpClient.get(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            timeout {
+                connectTimeoutMillis = 30_000
+                requestTimeoutMillis = 45_000
+                socketTimeoutMillis = 45_000
+            }
+        }.body()
+    }
+
+    suspend fun ackCommand(baseUrl: String, token: String, payload: AckCommandPayload): Unit {
+        val url = buildUrl(baseUrl, ApiEndpoints.DEVICE_COMMANDS_ACK)
+        httpClient.post(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(payload)
+            timeout {
+                connectTimeoutMillis = 30_000
+                requestTimeoutMillis = 45_000
+                socketTimeoutMillis = 45_000
+            }
+        }
     }
 }
