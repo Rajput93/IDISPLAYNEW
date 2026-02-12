@@ -37,6 +37,13 @@ class MediaDownloadManager(private val context: Context) {
             return File(baseDir, MEDIA_DIR_NAME).also { if (!it.exists()) it.mkdirs() }
         }
 
+    /** Returns existing file path if a file with this [fileName] exists in media dir; null otherwise. */
+    fun getExistingFilePath(fileName: String): String? {
+        if (fileName.isBlank()) return null
+        val file = File(mediaDir, fileName)
+        return file.absolutePath.takeIf { file.exists() }
+    }
+
     suspend fun downloadIfNeeded(url: String, fileName: String): String? = withContext(Dispatchers.IO) {
         if (url.isBlank() || fileName.isBlank()) return@withContext null
         val safeFileName = fileName.takeIf { it.isNotBlank() } ?: url.substringAfterLast('/').ifBlank { "media_${System.currentTimeMillis()}" }

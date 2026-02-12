@@ -247,10 +247,20 @@ class ScheduleRepository(
         _tickersFromApi.value = tickersFromResponse
         val layoutJson = json.encodeToString(layout)
 
-        // Remove zones no longer in API: delete their media rows and files
+        // File names still needed in new layout (so we don't delete file if another zone uses it)
+        val currentLayoutFileNames = layout.zones.flatMap { zone ->
+            zone.playlist.filter { it.url.isNotBlank() }.map { item ->
+                item.fileName.takeIf { it.isNotBlank() }
+                    ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
+            }
+        }.toSet()
+
+        // Remove zones no longer in API: delete media rows; delete file only if fileName not used elsewhere
         val existingMedia = mediaDao.getAllByScheduleId(scheduleId)
         existingMedia.filter { it.zoneId !in apiZoneIds }.forEach { media ->
-            downloadManager.deleteFileByPath(media.localPath)
+            if (media.fileName !in currentLayoutFileNames) {
+                downloadManager.deleteFileByPath(media.localPath)
+            }
             mediaDao.delete(media)
         }
 
@@ -283,12 +293,14 @@ class ScheduleRepository(
                         ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
                     currentFileNames.add(effectiveFileName)
                     val existing = mediaDao.getByFileName(effectiveFileName)
-                    val hadLocal = existing?.localPath != null && downloadManager.isFilePresent(existing.localPath)
+                    val hadLocalInDb = existing?.localPath != null && downloadManager.isFilePresent(existing.localPath)
+                    val existingPathByFileName = downloadManager.getExistingFilePath(effectiveFileName)
                     val localPath = when {
-                        hadLocal -> existing!!.localPath
+                        hadLocalInDb -> existing!!.localPath
+                        existingPathByFileName != null -> existingPathByFileName
                         else -> downloadManager.downloadIfNeeded(downloadUrl, effectiveFileName)
                     }
-                    if (localPath != null && !hadLocal) {
+                    if (localPath != null && !hadLocalInDb && existingPathByFileName == null) {
                         if (item.type.equals("video", ignoreCase = true)) downloadedVideos++
                         else downloadedImages++
                     }

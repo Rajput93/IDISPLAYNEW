@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -112,6 +113,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     .offset(leftDp, topDp)
                                     .size(widthDp, heightDp)
                                     .clip(RectangleShape)
+                                    .graphicsLayer { clip = true }
                                     .background(parseHexColor(zone.backgroundColor))
                                     .border(2.dp, Color.White)
                             ) {

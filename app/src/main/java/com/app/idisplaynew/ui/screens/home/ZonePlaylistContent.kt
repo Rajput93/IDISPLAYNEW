@@ -89,7 +89,7 @@ fun ZonePlaylistContent(
         if (index !in playlist.indices) return@AnimatedContent
         val item = playlist[index]
         if (!isDisplayable(item)) return@AnimatedContent
-        key(item.mediaId) {
+        key(zoneId, item.mediaId) {
         when (item.type.lowercase()) {
             "video" -> ZoneVideoPlayer(
                 videoUrl = item.url,
