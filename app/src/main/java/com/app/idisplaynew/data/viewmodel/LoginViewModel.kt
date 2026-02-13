@@ -1,5 +1,6 @@
 package com.app.idisplaynew.data.viewmodel
 
+import android.app.Application
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -8,6 +9,7 @@ import com.app.idisplaynew.data.model.LoginPayload
 import com.app.idisplaynew.data.model.LoginResponse
 import com.app.idisplaynew.data.repository.Repository
 import com.app.idisplaynew.ui.utils.DataStoreManager
+import com.app.idisplaynew.ui.utils.getDeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +22,11 @@ data class LoginUiState(
     val clientId: String = "DVC-469407DD"
 )
 
-class LoginViewModel(private val repository: Repository, private val dataStoreManager: DataStoreManager) : ViewModel() {
+class LoginViewModel(
+    private val repository: Repository,
+    private val dataStoreManager: DataStoreManager,
+    private val application: Application
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -53,15 +59,16 @@ class LoginViewModel(private val repository: Repository, private val dataStoreMa
             _error.value = "Client ID is required"
             return
         }
+        val deviceInfo = application.getDeviceInfo()
         val request = LoginPayload(
             deviceId = clientId,
-            name = "DisplayHub Device",
-            ipAddress = "0.0.0.0",
-            resolution = "1920x1080",
-            orientation = "landscape",
-            appVersion = "1.0",
-            osVersion = "Android",
-            registrationCode = "254565"
+            name = deviceInfo.name,
+            ipAddress = deviceInfo.ipAddress,
+            resolution = deviceInfo.resolution,
+            orientation = deviceInfo.orientation,
+            appVersion = deviceInfo.appVersion,
+            osVersion = deviceInfo.osVersion,
+            registrationCode = deviceInfo.deviceId
         )
         viewModelScope.launch {
             _isLoading.value = true

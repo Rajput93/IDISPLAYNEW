@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.map
@@ -55,6 +56,33 @@ class ScheduleRepository(
     private val _tickersFromApi = MutableStateFlow<List<ScheduleCurrentResponse.ScheduleResult.Ticker>>(emptyList())
     val tickersFromApi: StateFlow<List<ScheduleCurrentResponse.ScheduleResult.Ticker>> = _tickersFromApi.asStateFlow()
 
+    /** Call after syncFromApi() returns so layout flow re-reads DB and UI shows newly downloaded media. */
+    fun notifyLayoutRefresh() {
+        refreshTrigger.tryEmit(Unit)
+        layoutRefreshCount.value += 1
+    }
+
+    /**
+     * One-shot read: current layout + tickers from DB. Use after sync so UI updates even when
+     * flow doesn't re-emit (e.g. single image → multiple).
+     */
+    suspend fun getCurrentLayoutAndTickersSnapshot(): Pair<ScheduleCurrentResponse.ScheduleResult.Layout?, List<ScheduleCurrentResponse.ScheduleResult.Ticker>> =
+        withContext(Dispatchers.IO) {
+            val now = nowIso()
+            val entity = scheduleDao.getCurrentScheduleOnce(now)
+            val layout: ScheduleCurrentResponse.ScheduleResult.Layout? = when {
+                entity == null -> null
+                else -> {
+                    val l = entityToLayout(entity) ?: null
+                    if (l == null) null else {
+                        val mediaList = mediaDao.getAllByScheduleId(entity.scheduleId)
+                        mergeLayoutWithMedia(l, mediaList)
+                    }
+                }
+            }
+            layout to _tickersFromApi.value
+        }
+
     /** Current time in ISO-8601 for start/end comparison. */
     private fun nowIso(): String = Instant.now().toString()
 
@@ -84,20 +112,14 @@ class ScheduleRepository(
         )
             .flatMapLatest { now -> scheduleDao.getCurrentSchedule(now) }
             .flatMapLatest { entity ->
-                flow {
-                    if (entity == null) {
-                        emit(null)
-                        return@flow
-                    }
-                    val layout = entityToLayout(entity)
-                    if (layout == null) {
-                        emit(null)
-                        return@flow
-                    }
-                    mediaDao.getAllByScheduleIdFlow(entity.scheduleId).collect { mediaList ->
-                        emit(mergeLayoutWithMedia(layout, mediaList))
-                    }
-                }
+                if (entity == null) return@flatMapLatest flowOf(null)
+                val layout = entityToLayout(entity)
+                if (layout == null) return@flatMapLatest flowOf(null)
+                // combine so Room's media_file invalidation (on insert) triggers re-emit and UI updates
+                combine(
+                    flowOf(layout),
+                    mediaDao.getAllByScheduleIdFlow(entity.scheduleId)
+                ) { layoutOnly, mediaList -> mergeLayoutWithMedia(layoutOnly, mediaList) }
             }
             .flowOn(Dispatchers.IO)
 
@@ -282,22 +304,26 @@ class ScheduleRepository(
         val currentLayout = current?.let { entityToLayout(it) }
         val currentZoneIds = currentLayout?.zones?.map { it.zoneId }?.toSet() ?: emptySet()
 
-        // Only update when zoneIds or layoutId or lastUpdated changed – no API apply, no flicker
-        if (current != null && currentZoneIds == apiZoneIds &&
-            current.layoutId == result.layoutId && current.lastUpdated == result.lastUpdated) {
-            return null
-        }
-
-        _tickersFromApi.value = tickersFromResponse
-        val layoutJson = json.encodeToString(layout)
-
-        // File names still needed in new layout (so we don't delete file if another zone uses it)
-        val currentLayoutFileNames = layout.zones.flatMap { zone ->
+        // File names from API layout (used for skip check and later for delete logic)
+        val apiLayoutFileNames = layout.zones.flatMap { zone ->
             zone.playlist.filter { it.url.isNotBlank() }.map { item ->
                 item.fileName.takeIf { it.isNotBlank() }
                     ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
             }
         }.toSet()
+        val currentDbFileNames = mediaDao.getAllByScheduleId(scheduleId).map { it.fileName }.toSet()
+
+        // Skip only when zones, layoutId, lastUpdated AND playlist (file names) are unchanged.
+        // Otherwise adding only new images (same layoutId/lastUpdated) would never sync.
+        if (current != null && currentZoneIds == apiZoneIds &&
+            current.layoutId == result.layoutId && current.lastUpdated == result.lastUpdated &&
+            apiLayoutFileNames == currentDbFileNames) {
+            return null
+        }
+
+        _tickersFromApi.value = tickersFromResponse
+        val layoutJson = json.encodeToString(layout)
+        val currentLayoutFileNames = apiLayoutFileNames
 
         // Remove zones no longer in API: delete media rows; delete file only if fileName not used elsewhere
         val existingMedia = mediaDao.getAllByScheduleId(scheduleId)
@@ -320,8 +346,7 @@ class ScheduleRepository(
             tickersJson = "[]"
         )
         scheduleDao.insert(entity)
-        refreshTrigger.tryEmit(Unit)
-        layoutRefreshCount.value += 1
+        // Do not refresh here – wait until after all media is downloaded and inserted (see notifyLayoutRefresh after sync)
 
         // 3) Sync media: for each playlist item, ensure file exists (download if not); count new downloads
         // API often returns relative URLs (e.g. /uploads/video.mp4) – resolve with baseUrl for download
@@ -372,6 +397,8 @@ class ScheduleRepository(
                 mediaDao.delete(media)
             }
         }
+
+        // Caller (ViewModel) must call notifyLayoutRefresh() after syncFromApi() returns so UI updates
 
         return SyncResult(
             downloadedImages = downloadedImages,

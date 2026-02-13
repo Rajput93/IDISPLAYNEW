@@ -96,7 +96,7 @@ fun LoginScreen(
                     message = response.message.ifBlank { "Device registered successfully" },
                     withDismissAction = true
                 )
-                delay(1500)
+                delay(400)
                 viewModel.clearRegisterResponse()
                 onLoginSuccess()
             }

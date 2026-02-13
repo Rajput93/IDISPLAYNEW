@@ -58,10 +58,15 @@ class HomeViewModel(
                     _isLoading.value = false
                 }
         }
-        // Poll schedule API every 5 sec
+        // Poll schedule API every 5 sec; after sync set layout from DB snapshot so new downloads show (single → multiple)
         syncJob = viewModelScope.launch {
             while (true) {
                 scheduleRepository.syncFromApi()
+                delay(150) // let DB commits be visible
+                val (layout, tickers) = scheduleRepository.getCurrentLayoutAndTickersSnapshot()
+                _layout.value = layout
+                _tickers.value = tickers
+                scheduleRepository.notifyLayoutRefresh()
                 delay(5_000)
             }
         }
@@ -69,6 +74,11 @@ class HomeViewModel(
         commandsJob = viewModelScope.launch {
             while (true) {
                 scheduleRepository.fetchAndProcessCommands()
+                delay(150)
+                val (layout, tickers) = scheduleRepository.getCurrentLayoutAndTickersSnapshot()
+                _layout.value = layout
+                _tickers.value = tickers
+                scheduleRepository.notifyLayoutRefresh()
                 delay(10_000)
             }
         }

@@ -8,15 +8,15 @@ import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 import com.app.idisplaynew.data.remote.ApiEndpoints
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRedirect
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.plugins.timeout
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.HttpHeaders
@@ -24,7 +24,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 object Repository {
-    private val httpClient = HttpClient(CIO) {
+    private val httpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -33,9 +33,12 @@ object Repository {
         }
         install(HttpRedirect)
         install(HttpTimeout) {
-            requestTimeoutMillis = 60_000L
-            connectTimeoutMillis = 60_000L
-            socketTimeoutMillis = 60_000L
+            requestTimeoutMillis = 90_000L
+            connectTimeoutMillis = 30_000L
+            socketTimeoutMillis = 90_000L
+        }
+        defaultRequest {
+            header(HttpHeaders.UserAgent, "DisplayHub-Android/1.0")
         }
     }
 
@@ -58,11 +61,6 @@ object Repository {
         val url = buildUrl(baseUrl, ApiEndpoints.SCHEDULE_CURRENT)
         return httpClient.get(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
-            timeout {
-                connectTimeoutMillis = 60_000
-                requestTimeoutMillis = 60_000
-                socketTimeoutMillis = 60_000
-            }
         }.body()
     }
 
@@ -70,11 +68,6 @@ object Repository {
         val url = buildUrl(baseUrl, ApiEndpoints.DEVICE_COMMANDS)
         return httpClient.get(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
-            timeout {
-                connectTimeoutMillis = 60_000
-                requestTimeoutMillis = 60_000
-                socketTimeoutMillis = 60_000
-            }
         }.body()
     }
 
@@ -84,11 +77,6 @@ object Repository {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(payload)
-            timeout {
-                connectTimeoutMillis = 60_000
-                requestTimeoutMillis = 60_000
-                socketTimeoutMillis = 60_000
-            }
         }
     }
 }

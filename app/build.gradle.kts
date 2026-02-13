@@ -56,9 +56,9 @@ dependencies {
     //Image display
     implementation ("com.squareup.picasso:picasso:2.71828")
 
-    // Ktor dependencies
+    // Ktor dependencies (OkHttp engine recommended on Android to avoid request timeouts)
     implementation("io.ktor:ktor-client-core:2.3.4")
-    implementation("io.ktor:ktor-client-cio:2.3.4")
+    implementation("io.ktor:ktor-client-okhttp:2.3.4")
     implementation("io.ktor:ktor-client-logging:2.3.4")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")

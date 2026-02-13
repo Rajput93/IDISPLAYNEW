@@ -1,5 +1,6 @@
 package com.app.idisplaynew
 
+import android.app.Application
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -76,9 +77,10 @@ private fun DisplayHubApp() {
 
         composable("login") {
             val context = LocalContext.current
+            val app = context.applicationContext as Application
             val dataStoreManager = remember { DataStoreManager(context.applicationContext) }
             val viewModel: LoginViewModel = viewModel(
-                factory = LoginViewModelFactory(Repository, dataStoreManager)
+                factory = LoginViewModelFactory(Repository, dataStoreManager, app)
             )
             LoginScreen(
                 viewModel = viewModel,
