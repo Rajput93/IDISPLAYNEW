@@ -69,7 +69,11 @@ data class ScheduleCurrentResponse(
                     @SerialName("checksum") val checksum: String? = null,
                     @SerialName("htmlContent") val htmlContent: String? = null,
                     @SerialName("sourceUrl") val sourceUrl: String? = null,
-                    @SerialName("refreshInterval") val refreshInterval: Int? = null
+                    @SerialName("refreshInterval") val refreshInterval: Int? = null,
+                    @SerialName("transitionEffectId") val transitionEffectId: Int? = null,
+                    @SerialName("transitionEffectName") val transitionEffectName: String? = null,
+                    @SerialName("transitionEffectCssClass") val transitionEffectCssClass: String? = null,
+                    @SerialName("transitionEffectDurationMs") val transitionEffectDurationMs: Int? = null
                 )
             }
         }

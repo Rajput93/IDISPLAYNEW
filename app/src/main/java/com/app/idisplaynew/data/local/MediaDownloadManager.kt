@@ -3,11 +3,11 @@ package com.app.idisplaynew.data.local
 import android.content.Context
 import android.os.Environment
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRedirect
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -44,14 +44,24 @@ class MediaDownloadManager(private val context: Context) {
         return file.absolutePath.takeIf { file.exists() }
     }
 
+    /** Streams download to file to avoid OOM on large videos (no full response in memory). */
     suspend fun downloadIfNeeded(url: String, fileName: String): String? = withContext(Dispatchers.IO) {
         if (url.isBlank() || fileName.isBlank()) return@withContext null
         val safeFileName = fileName.takeIf { it.isNotBlank() } ?: url.substringAfterLast('/').ifBlank { "media_${System.currentTimeMillis()}" }
         val file = File(mediaDir, safeFileName)
         if (file.exists()) return@withContext file.absolutePath
         try {
-            val bytes: ByteArray = httpClient.get(url).body()
-            file.writeBytes(bytes)
+            httpClient.prepareGet(url).execute { response ->
+                val channel = response.bodyAsChannel()
+                file.outputStream().use { out ->
+                    val buffer = ByteArray(8192)
+                    while (!channel.isClosedForRead) {
+                        val n = channel.readAvailable(buffer, 0, buffer.size)
+                        if (n <= 0) break
+                        out.write(buffer, 0, n)
+                    }
+                }
+            }
             file.absolutePath
         } catch (e: Exception) {
             null
