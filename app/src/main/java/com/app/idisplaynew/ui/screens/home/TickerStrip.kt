@@ -11,9 +11,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -28,7 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -41,25 +48,50 @@ fun TickerStrip(
     val textColor = parseHexColorTicker(ticker.textColor)
     val backgroundColor = parseHexColorTicker(ticker.backgroundColor)
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .height(heightDp)
             .background(backgroundColor)
-            .clip(RectangleShape)
+            .clip(RectangleShape),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Brand logo fixed on left – ticker height ke hisaab se, same background pe
+        val brandUrl = ticker.brandImageUrl?.takeIf { it.isNotBlank() }
+        if (brandUrl != null) {
+            Box(
+                modifier = Modifier
+                    .height(heightDp)
+                    .width(heightDp)
+                    .background(backgroundColor)
+                    .clip(RectangleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = brandUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp)
+                        .clip(RectangleShape),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+
+        // Scrolling text (remaining width) – clip taaki logo ke upar se na jaaye, sirf isi area mein dikhe
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(heightDp)
+                .clip(RectangleShape)
         ) {
             var textWidthPx by remember { mutableStateOf(0f) }
             val containerWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
 
             key(textWidthPx, ticker.speed) {
-                // Higher API speed = faster scroll (shorter duration), lower speed = slower scroll. Clamp 1s–120s.
                 val durationMs = (60000 / maxOf(1, ticker.speed)).toInt().coerceIn(1000, 120000)
-                val targetOffsetPx = if (textWidthPx > 0) -(textWidthPx + 100f) else containerWidthPx - 100f
+                val targetOffsetPx = if (textWidthPx > 0) -(textWidthPx + 16f) else -containerWidthPx
                 val infiniteTransition = rememberInfiniteTransition(label = "ticker")
                 val offsetPx by infiniteTransition.animateFloat(
                     initialValue = containerWidthPx,
@@ -69,7 +101,8 @@ fun TickerStrip(
                             durationMillis = if (textWidthPx > 0) durationMs else 1,
                             easing = LinearEasing
                         ),
-                        repeatMode = RepeatMode.Restart
+                        repeatMode = RepeatMode.Restart,
+                        initialStartOffset = androidx.compose.animation.core.StartOffset(0)
                     ),
                     label = "tickerOffset"
                 )
@@ -78,29 +111,24 @@ fun TickerStrip(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(heightDp)
+                        .clip(RectangleShape)
                         .layout { measurable, constraints ->
                             val unboundedConstraints = constraints.copy(maxWidth = Int.MAX_VALUE)
                             val placeable = measurable.measure(unboundedConstraints)
-                            if (placeable.width > 0) {
-                                textWidthPx = placeable.width.toFloat()
-                            }
+                            if (placeable.width > 0) textWidthPx = placeable.width.toFloat()
                             layout(constraints.maxWidth, constraints.maxHeight) {
                                 placeable.place(offsetPx.toInt(), 0)
                             }
                         },
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = ticker.text,
-                            color = textColor,
-                            fontSize = ticker.fontSize.sp,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
+                    Text(
+                        text = ticker.text,
+                        color = textColor,
+                        fontSize = ticker.fontSize.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }

@@ -34,6 +34,7 @@ data class ScheduleCurrentResponse(
             @SerialName("backgroundColor") val backgroundColor: String = "#ffffff",
             @SerialName("position") val position: String = "bottom",
             @SerialName("height") val height: Int = 50,
+            @SerialName("brandImageUrl") val brandImageUrl: String? = null,
             @SerialName("priority") val priority: Int = 1
         )
         @Serializable
