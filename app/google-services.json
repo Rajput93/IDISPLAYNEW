@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "38686409316",
+    "project_id": "displayhub-1cebb",
+    "storage_bucket": "displayhub-1cebb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:38686409316:android:15431f463c89f27ee81571",
+        "android_client_info": {
+          "package_name": "com.app.idisplaynew"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8JYuTO-ncfrCaYfQcOOQbp56A21Togzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

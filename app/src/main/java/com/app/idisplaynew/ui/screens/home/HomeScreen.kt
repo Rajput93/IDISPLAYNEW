@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -39,12 +40,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.app.idisplaynew.R
 import com.app.idisplaynew.data.viewmodel.HomeViewModel
+import com.app.idisplaynew.data.viewmodel.ScreenshotViewModel
 import com.app.idisplaynew.ui.theme.DisplayHubCardBackground
+import com.app.idisplaynew.ui.utils.bitmapToJpegBytes
+import com.app.idisplaynew.ui.utils.captureScreenBitmap
+import com.app.idisplaynew.ui.utils.captureScreenBitmapAfterPost
+import com.app.idisplaynew.ui.utils.waitForNextFrame
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
-fun HomeScreen(viewModel: HomeViewModel) {
+fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewModel) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val layout by viewModel.layout.collectAsState()
     val tickers by viewModel.tickers.collectAsState()
     val apiMessage by viewModel.apiMessage.collectAsState()
@@ -52,6 +63,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val error by viewModel.error.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val mediaStoragePath by viewModel.mediaStoragePath.collectAsState()
+    val screenshotFeedback by screenshotViewModel.screenshotFeedback.collectAsState()
 
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
@@ -60,10 +72,43 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 
+    LaunchedEffect(screenshotFeedback) {
+        if (screenshotFeedback != null) {
+            Toast.makeText(context, screenshotFeedback, Toast.LENGTH_SHORT).show()
+            screenshotViewModel.clearScreenshotFeedback()
+        }
+    }
+
     LaunchedEffect(layout) {
-        (context as? Activity)?.requestedOrientation = when (layout?.orientation?.equals("portrait", ignoreCase = true)) {
+        activity?.requestedOrientation = when (layout?.orientation?.equals("portrait", ignoreCase = true)) {
             true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
+
+    // Remote View: on take_screenshot from SSE, capture screen and upload
+    LaunchedEffect(screenshotViewModel, activity) {
+        if (activity == null) return@LaunchedEffect
+        screenshotViewModel.screenshotRequest.collectLatest { request ->
+            waitForNextFrame()
+            delay(150)
+            var bitmap = captureScreenBitmap(activity)
+            var attempt = 0
+            while (bitmap == null && attempt < 4) {
+                delay(150L * (attempt + 1))
+                bitmap = if (attempt % 2 == 0) {
+                    captureScreenBitmapAfterPost(activity)
+                } else {
+                    captureScreenBitmap(activity)
+                }
+                attempt++
+            }
+            val jpegBytes = bitmapToJpegBytes(bitmap)
+            if (jpegBytes != null) {
+                screenshotViewModel.uploadScreenshot(jpegBytes, request.sessionId)
+            } else {
+                screenshotViewModel.onScreenshotCaptureFailed()
+            }
         }
     }
 
@@ -189,6 +234,19 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 }
             }
         }
+
+       /* // Debug: test button to trigger a crash and verify Firebase Crashlytics
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Button(
+                onClick = { throw RuntimeException("Test crash for Firebase Crashlytics") }
+            ) {
+                Text("Test Crash")
+            }
+        }*/
     }
 }
 

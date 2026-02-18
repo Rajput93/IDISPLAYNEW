@@ -28,6 +28,8 @@ import com.app.idisplaynew.data.repository.ScheduleRepository
 import com.app.idisplaynew.data.viewmodel.HomeViewModel
 import com.app.idisplaynew.data.viewmodel.HomeViewModelFactory
 import com.app.idisplaynew.data.viewmodel.LoginViewModel
+import com.app.idisplaynew.data.viewmodel.ScreenshotViewModel
+import com.app.idisplaynew.data.viewmodel.ScreenshotViewModelFactory
 import com.app.idisplaynew.data.viewmodel.LoginViewModelFactory
 import com.app.idisplaynew.ui.screens.login.LoginScreen
 import com.app.idisplaynew.ui.screens.home.HomeScreen
@@ -109,6 +111,9 @@ private fun DisplayHubApp() {
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModelFactory(scheduleRepository)
             )
+            val screenshotViewModel: ScreenshotViewModel = viewModel(
+                factory = ScreenshotViewModelFactory(dataStoreManager)
+            )
 
             DisposableEffect(Unit) {
                 val window = (view.context as? ComponentActivity)?.window
@@ -127,7 +132,7 @@ private fun DisplayHubApp() {
                 onDispose { }
             }
 
-            HomeScreen(viewModel = homeViewModel)
+            HomeScreen(viewModel = homeViewModel, screenshotViewModel = screenshotViewModel)
         }
     }
 }

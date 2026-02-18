@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.kapt)
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -56,6 +58,10 @@ dependencies {
     //Image display
     implementation ("com.squareup.picasso:picasso:2.71828")
 
+    // OkHttp + SSE for Remote View (Server-Sent Events)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+
     // Ktor dependencies (OkHttp engine recommended on Android to avoid request timeouts)
     implementation("io.ktor:ktor-client-core:2.3.4")
     implementation("io.ktor:ktor-client-okhttp:2.3.4")
@@ -93,12 +99,13 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     kapt("androidx.room:room-compiler:2.6.1")
 
-    //firebase FCM
+    // Firebase (FCM, Analytics, Auth, Crashlytics)
     implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
-    implementation ("com.google.firebase:firebase-messaging:23.0.0")
-    implementation ("com.google.firebase:firebase-analytics")
-    implementation ("com.google.firebase:firebase-auth:22.3.1")
-    implementation ("com.google.android.gms:play-services-auth:19.2.0")
+    implementation("com.google.firebase:firebase-messaging:23.0.0")
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth:22.3.1")
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation("com.google.android.gms:play-services-auth:19.2.0")
 
 
     testImplementation(libs.junit)

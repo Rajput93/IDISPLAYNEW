@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.app.idisplaynew" />
+                  <option name="mobileSdkAppId" value="1:38686409316:android:15431f463c89f27ee81571" />
+                  <option name="projectId" value="displayhub-1cebb" />
+                  <option name="projectNumber" value="38686409316" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
