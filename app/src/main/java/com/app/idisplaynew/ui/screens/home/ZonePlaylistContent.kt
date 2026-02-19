@@ -31,13 +31,15 @@ import com.app.idisplaynew.data.model.ScheduleCurrentResponse
 import kotlinx.coroutines.delay
 
 private fun isDisplayable(item: ScheduleCurrentResponse.ScheduleResult.Layout.Zone.PlaylistItem): Boolean {
-    return when (item.type.equals("video", ignoreCase = true)) {
-        true -> item.url.isNotBlank()
-        false -> when (item.type.lowercase()) {
-            "image", "document" -> item.url.isNotBlank()
+    val type = item.type ?: ""
+    val url = item.url ?: ""
+    return when (type.equals("video", ignoreCase = true)) {
+        true -> url.isNotBlank()
+        false -> when (type.lowercase()) {
+            "image", "document" -> url.isNotBlank()
             "notice", "event", "motivational", "weather", "url" ->
                 !item.htmlContent.isNullOrBlank() || !item.sourceUrl.isNullOrBlank()
-            else -> item.url.isNotBlank()
+            else -> url.isNotBlank()
         }
     }
 }
@@ -87,7 +89,8 @@ private fun contentTransformForTransition(
 fun ZonePlaylistContent(
     zoneId: Int,
     playlist: List<ScheduleCurrentResponse.ScheduleResult.Layout.Zone.PlaylistItem>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDisplayedMediaChanged: ((zoneId: Int, mediaId: Int) -> Unit)? = null
 ) {
     if (playlist.isEmpty()) return
 
@@ -97,12 +100,18 @@ fun ZonePlaylistContent(
     val displayIndex = currentIndex.coerceIn(0, playlist.size - 1)
 
     SideEffect {
+        val item = playlist.getOrNull(displayIndex)
+        val mediaId = item?.mediaId ?: 0
+        onDisplayedMediaChanged?.invoke(zoneId, mediaId)
+    }
+
+    SideEffect {
         if (currentIndex != displayIndex) currentIndex = displayIndex
     }
     SideEffect {
         val size = playlist.size
         if (size > prevPlaylistSize && lastPlayingMediaId != null) {
-            val found = playlist.indexOfFirst { it.mediaId == lastPlayingMediaId }
+            val found = playlist.indexOfFirst { (it.mediaId ?: 0) == lastPlayingMediaId }
             if (found >= 0) currentIndex = found
         }
         prevPlaylistSize = size
@@ -112,7 +121,7 @@ fun ZonePlaylistContent(
     val currentItem = playlist[displayIndex]
 
     // Skip non-displayable items after a short delay (advance to next so we don't get stuck)
-    LaunchedEffect(displayIndex, currentItem.mediaId, currentItem.url, currentItem.htmlContent, currentItem.sourceUrl) {
+    LaunchedEffect(displayIndex, currentItem.mediaId ?: 0, currentItem.url.orEmpty(), currentItem.htmlContent, currentItem.sourceUrl) {
         if (!isDisplayable(currentItem)) {
             delay(300)
             currentIndex = (displayIndex + 1) % playlist.size
@@ -137,19 +146,19 @@ fun ZonePlaylistContent(
         if (index !in playlist.indices) return@AnimatedContent
         val item = playlist[index]
         if (!isDisplayable(item)) return@AnimatedContent
-        key(zoneId, item.mediaId) {
-        when (item.type.lowercase()) {
+        key(zoneId, item.mediaId ?: 0) {
+        when ((item.type ?: "").lowercase()) {
             "video" -> ZoneVideoPlayer(
-                videoUrl = item.url,
+                videoUrl = item.url.orEmpty(),
                 modifier = Modifier.fillMaxSize(),
                 onPlaybackEnded = if (playlist.size == 1) null else {
                     { currentIndex = (displayIndex + 1) % playlist.size }
                 },
-                playerKey = zoneId * 10000 + item.mediaId
+                playerKey = zoneId * 10000 + (item.mediaId ?: 0)
             )
             "image" -> ZoneImageView(
-                imageUrl = item.url,
-                durationSeconds = item.duration.coerceAtLeast(1),
+                imageUrl = item.url.orEmpty(),
+                durationSeconds = (item.duration ?: 0).coerceAtLeast(1),
                 modifier = Modifier.fillMaxSize(),
                 onDurationReached = {
                     currentIndex = (displayIndex + 1) % playlist.size
@@ -158,24 +167,24 @@ fun ZonePlaylistContent(
             "notice", "event", "motivational", "weather", "url" -> ZoneWebView(
                 htmlContent = item.htmlContent,
                 sourceUrl = item.sourceUrl,
-                durationSeconds = item.duration.coerceAtLeast(1),
+                durationSeconds = (item.duration ?: 0).coerceAtLeast(1),
                 modifier = Modifier.fillMaxSize(),
                 onDurationReached = {
                     currentIndex = (displayIndex + 1) % playlist.size
                 }
             )
             "document" -> ZoneDocumentView(
-                documentUrl = item.url,
-                fileName = item.fileName,
-                durationSeconds = item.duration.coerceAtLeast(1),
+                documentUrl = item.url.orEmpty(),
+                fileName = item.fileName.orEmpty(),
+                durationSeconds = (item.duration ?: 0).coerceAtLeast(1),
                 modifier = Modifier.fillMaxSize(),
                 onDurationReached = {
                     currentIndex = (displayIndex + 1) % playlist.size
                 }
             )
             else -> ZoneImageView(
-                imageUrl = item.url,
-                durationSeconds = item.duration.coerceAtLeast(1),
+                imageUrl = item.url.orEmpty(),
+                durationSeconds = (item.duration ?: 0).coerceAtLeast(1),
                 modifier = Modifier.fillMaxSize(),
                 onDurationReached = {
                     currentIndex = (displayIndex + 1) % playlist.size

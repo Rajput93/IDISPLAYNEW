@@ -134,17 +134,24 @@ class ScheduleRepository(
         val urlByFileName = mediaList
             .filter { it.localPath != null && downloadManager.isFilePresent(it.localPath!!) }
             .associate { it.fileName to it.localPath!! }
-        val zonesWithLocalUrls = layout.zones.map { zone ->
-            zone.copy(playlist = zone.playlist.map { item ->
-                val localPath = localPathByZoneAndMedia[zone.zoneId to item.mediaId]
-                    ?: item.fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
-                val isVideoOrImage = item.type.equals("video", ignoreCase = true) || item.type.equals("image", ignoreCase = true)
-                val isDocument = item.type.equals("document", ignoreCase = true)
-                val isPdf = item.fileName.endsWith(".pdf", true) || item.url.contains(".pdf", true)
+        val zones = layout.zones ?: emptyList()
+        val zonesWithLocalUrls = zones.map { zone ->
+            val zoneId = zone.zoneId ?: 0
+            val playlist = zone.playlist ?: emptyList()
+            zone.copy(playlist = playlist.map { item ->
+                val mediaId = item.mediaId ?: 0
+                val type = item.type ?: ""
+                val fileName = item.fileName ?: ""
+                val url = item.url ?: ""
+                val localPath = localPathByZoneAndMedia[zoneId to mediaId]
+                    ?: fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
+                val isVideoOrImage = type.equals("video", ignoreCase = true) || type.equals("image", ignoreCase = true)
+                val isDocument = type.equals("document", ignoreCase = true)
+                val isPdf = fileName.endsWith(".pdf", true) || url.contains(".pdf", true)
                 val displayUrl = when {
                     isDocument -> when {
                         localPath != null && isPdf -> "file://$localPath"
-                        else -> item.url
+                        else -> url
                     }
                     isVideoOrImage -> when {
                         localPath != null -> "file://$localPath"
@@ -152,7 +159,7 @@ class ScheduleRepository(
                     }
                     else -> when {
                         localPath != null -> "file://$localPath"
-                        else -> item.url
+                        else -> url
                     }
                 }
                 item.copy(url = displayUrl)
@@ -171,6 +178,7 @@ class ScheduleRepository(
 
     /** Derive a unique fileName when API sends blank (so we can still download and look up by zoneId+mediaId). */
     private fun deriveFileNameFromUrl(url: String, zoneId: Int, mediaId: Int, type: String): String {
+        if (url.isBlank()) return "media_${zoneId}_${mediaId}.bin"
         val fromUrl = url.substringAfterLast('/').substringBefore('?').trim()
         val ext = when {
             fromUrl.contains(".") -> fromUrl.substringAfterLast('.', "").take(4)
@@ -299,16 +307,18 @@ class ScheduleRepository(
             return null
         }
 
-        val apiZoneIds = layout.zones.map { it.zoneId }.toSet()
+        val layoutZones = layout.zones ?: emptyList()
+        val apiZoneIds = layoutZones.map { it.zoneId ?: 0 }.toSet()
         val current = scheduleDao.getByScheduleId(scheduleId)
         val currentLayout = current?.let { entityToLayout(it) }
-        val currentZoneIds = currentLayout?.zones?.map { it.zoneId }?.toSet() ?: emptySet()
+        val currentZoneIds = currentLayout?.zones?.map { it.zoneId ?: 0 }?.toSet() ?: emptySet()
 
         // File names from API layout (used for skip check and later for delete logic)
-        val apiLayoutFileNames = layout.zones.flatMap { zone ->
-            zone.playlist.filter { it.url.isNotBlank() }.map { item ->
-                item.fileName.takeIf { it.isNotBlank() }
-                    ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
+        val apiLayoutFileNames = layoutZones.flatMap { zone ->
+            val zoneId = zone.zoneId ?: 0
+            (zone.playlist ?: emptyList()).filter { (it.url ?: "").isNotBlank() }.map { item ->
+                (item.fileName ?: "").takeIf { it.isNotBlank() }
+                    ?: deriveFileNameFromUrl(item.url ?: "", zoneId, item.mediaId ?: 0, item.type ?: "video")
             }
         }.toSet()
         val currentDbFileNames = mediaDao.getAllByScheduleId(scheduleId).map { it.fileName }.toSet()
@@ -340,7 +350,7 @@ class ScheduleRepository(
             layoutName = result.layoutName,
             startTime = result.startTime,
             endTime = result.endTime,
-            priority = result.priority,
+            priority = result.priority ?: 0,
             lastUpdated = result.lastUpdated,
             layoutJson = layoutJson,
             tickersJson = "[]"
@@ -354,12 +364,14 @@ class ScheduleRepository(
         var downloadedImages = 0
         var downloadedVideos = 0
         val currentFileNames = mutableSetOf<String>()
-        layout.zones.forEach { zone ->
-            zone.playlist.forEach { item ->
-                if (item.url.isNotBlank()) {
-                    val downloadUrl = resolveMediaUrl(normalizedBaseUrl, item.url)
-                    val effectiveFileName = item.fileName.takeIf { it.isNotBlank() }
-                        ?: deriveFileNameFromUrl(item.url, zone.zoneId, item.mediaId, item.type)
+        layoutZones.forEach { zone ->
+            val zoneId = zone.zoneId ?: 0
+            (zone.playlist ?: emptyList()).forEach { item ->
+                val itemUrl = item.url ?: ""
+                if (itemUrl.isNotBlank()) {
+                    val downloadUrl = resolveMediaUrl(normalizedBaseUrl, itemUrl)
+                    val effectiveFileName = (item.fileName ?: "").takeIf { it.isNotBlank() }
+                        ?: deriveFileNameFromUrl(itemUrl, zoneId, item.mediaId ?: 0, item.type ?: "video")
                     currentFileNames.add(effectiveFileName)
                     val existing = mediaDao.getByFileName(effectiveFileName)
                     val hadLocalInDb = existing?.localPath != null && downloadManager.isFilePresent(existing.localPath)
@@ -370,19 +382,19 @@ class ScheduleRepository(
                         else -> downloadManager.downloadIfNeeded(downloadUrl, effectiveFileName)
                     }
                     if (localPath != null && !hadLocalInDb && existingPathByFileName == null) {
-                        if (item.type.equals("video", ignoreCase = true)) downloadedVideos++
+                        if ((item.type ?: "").equals("video", ignoreCase = true)) downloadedVideos++
                         else downloadedImages++
                     }
                     val mediaEntity = MediaFileEntity(
                         fileName = effectiveFileName,
                         localPath = localPath,
-                        url = item.url,
+                        url = itemUrl,
                         scheduleId = scheduleId,
-                        zoneId = zone.zoneId,
-                        mediaId = item.mediaId,
-                        type = item.type,
-                        duration = item.duration,
-                        fileSizeBytes = item.fileSizeBytes,
+                        zoneId = zoneId,
+                        mediaId = item.mediaId ?: 0,
+                        type = item.type ?: "video",
+                        duration = item.duration ?: 0,
+                        fileSizeBytes = item.fileSizeBytes ?: 0L,
                         checksum = item.checksum
                     )
                     mediaDao.insert(mediaEntity)

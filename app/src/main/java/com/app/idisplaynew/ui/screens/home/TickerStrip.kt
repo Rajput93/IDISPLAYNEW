@@ -45,8 +45,8 @@ fun TickerStrip(
     heightDp: Dp,
     modifier: Modifier = Modifier
 ) {
-    val textColor = parseHexColorTicker(ticker.textColor)
-    val backgroundColor = parseHexColorTicker(ticker.backgroundColor)
+    val textColor = parseHexColorTicker(ticker.textColor ?: "#000000")
+    val backgroundColor = parseHexColorTicker(ticker.backgroundColor ?: "#ffffff")
 
     Row(
         modifier = modifier
@@ -74,7 +74,7 @@ fun TickerStrip(
                         .fillMaxSize()
                         .padding(2.dp)
                         .clip(RectangleShape),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Crop
                 )
             }
         }
@@ -89,8 +89,9 @@ fun TickerStrip(
             var textWidthPx by remember { mutableStateOf(0f) }
             val containerWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
 
-            key(textWidthPx, ticker.speed) {
-                val durationMs = (60000 / maxOf(1, ticker.speed)).toInt().coerceIn(1000, 120000)
+            key(textWidthPx, ticker.speed ?: 1) {
+                val speed = (ticker.speed ?: 1).coerceAtLeast(1)
+                val durationMs = (60000 / speed).toInt().coerceIn(1000, 120000)
                 val targetOffsetPx = if (textWidthPx > 0) -(textWidthPx + 16f) else -containerWidthPx
                 val infiniteTransition = rememberInfiniteTransition(label = "ticker")
                 val offsetPx by infiniteTransition.animateFloat(
@@ -123,9 +124,9 @@ fun TickerStrip(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
-                        text = ticker.text,
+                        text = ticker.text.orEmpty(),
                         color = textColor,
-                        fontSize = ticker.fontSize.sp,
+                        fontSize = (ticker.fontSize ?: 24).sp,
                         maxLines = 1,
                         softWrap = false
                     )

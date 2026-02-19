@@ -2,18 +2,25 @@ package com.app.idisplaynew.data.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.app.idisplaynew.data.model.HeartbeatPayload
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
+import com.app.idisplaynew.data.remote.DeviceStatsProvider
+import com.app.idisplaynew.data.repository.Repository
 import com.app.idisplaynew.data.repository.ScheduleRepository
+import com.app.idisplaynew.ui.utils.DataStoreManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-    private val scheduleRepository: ScheduleRepository
+    private val scheduleRepository: ScheduleRepository,
+    private val dataStoreManager: DataStoreManager,
+    private val deviceStatsProvider: DeviceStatsProvider
 ) : ViewModel() {
 
     private val _layout = MutableStateFlow<ScheduleCurrentResponse.ScheduleResult.Layout?>(null)
@@ -47,6 +54,17 @@ class HomeViewModel(
     private var syncJob: Job? = null
     private var commandsJob: Job? = null
     private var collectJob: Job? = null
+    private var heartbeatJob: Job? = null
+
+    /** For heartbeat payload: currently displayed media (zoneId_mediaId or empty). */
+    private val _currentDisplayedMediaId = MutableStateFlow<String>("")
+    val currentDisplayedMediaId: StateFlow<String> = _currentDisplayedMediaId.asStateFlow()
+    fun setCurrentDisplayedMediaId(zoneId: Int, mediaId: Int) {
+        _currentDisplayedMediaId.value = "${zoneId}_$mediaId"
+    }
+
+    /** Last heartbeat API result: "success" if 200, else "failed". Sent in next payload. */
+    private var lastHeartbeatStatus: String = "success"
 
     init {
         collectJob = viewModelScope.launch {
@@ -82,6 +100,33 @@ class HomeViewModel(
                 delay(10_000)
             }
         }
+        // Heartbeat every 10 sec (separate from commands); payload has device stats and status from previous call
+        heartbeatJob = viewModelScope.launch {
+            while (true) {
+                val baseUrl = dataStoreManager.baseUrl.first() ?: ""
+                val token = dataStoreManager.authToken.first() ?: ""
+                if (baseUrl.isNotBlank() && token.isNotBlank()) {
+                    val layoutId = _layout.value?.layoutId?.toString() ?: ""
+                    val mediaId = _currentDisplayedMediaId.value
+                    val payload = HeartbeatPayload(
+                        status = lastHeartbeatStatus,
+                        ipAddress = deviceStatsProvider.getIpAddress(),
+                        temperature = deviceStatsProvider.getTemperature(),
+                        cpuUsage = deviceStatsProvider.getCpuUsage(),
+                        memoryUsage = deviceStatsProvider.getMemoryUsage(),
+                        storageUsage = deviceStatsProvider.getStorageUsage(),
+                        storageAvailableMb = deviceStatsProvider.getStorageAvailableMb(),
+                        currentLayoutId = layoutId,
+                        currentMediaId = mediaId,
+                        appVersion = deviceStatsProvider.getAppVersion(),
+                        osVersion = deviceStatsProvider.getOsVersion()
+                    )
+                    val result = Repository.postHeartbeat(baseUrl, token, payload)
+                    lastHeartbeatStatus = if (result.isSuccess) "success" else "failed"
+                }
+                delay(10_000)
+            }
+        }
     }
 
     override fun onCleared() {
@@ -89,5 +134,6 @@ class HomeViewModel(
         syncJob?.cancel()
         commandsJob?.cancel()
         collectJob?.cancel()
+        heartbeatJob?.cancel()
     }
 }

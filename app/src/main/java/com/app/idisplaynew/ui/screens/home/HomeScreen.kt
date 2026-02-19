@@ -115,18 +115,22 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
     Box(modifier = Modifier.fillMaxSize()) {
         if (layout != null) {
             val currentLayout = layout!!
-            val topTickers = tickers.filter { it.position.equals("top", ignoreCase = true) }.sortedBy { it.priority }
-            val bottomTickers = tickers.filter { it.position.equals("bottom", ignoreCase = true) }.sortedBy { it.priority }
+            val safeScreenHeight = (currentLayout.screenHeight ?: 1080).coerceAtLeast(1)
+            val safeScreenWidth = (currentLayout.screenWidth ?: 1920).coerceAtLeast(1)
+            val safeZones = currentLayout.zones ?: emptyList()
+            val topTickers = tickers.filter { (it.position ?: "bottom").equals("top", ignoreCase = true) }.sortedBy { it.priority ?: 0 }
+            val bottomTickers = tickers.filter { (it.position ?: "bottom").equals("bottom", ignoreCase = true) }.sortedBy { it.priority ?: 0 }
 
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val density = LocalDensity.current.density
                 val screenHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                val tickerScaleY = screenHeightPx / currentLayout.screenHeight
+                val tickerScaleY = screenHeightPx / safeScreenHeight
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (topTickers.isNotEmpty()) {
                         topTickers.forEach { ticker ->
-                            val heightDp = (ticker.height * tickerScaleY / density).dp
+                            val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
+                            val heightDp = (tickerHeight * tickerScaleY / density).dp
                             TickerStrip(
                                 ticker = ticker,
                                 heightDp = heightDp,
@@ -142,16 +146,17 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
                     ) {
                     val zoneAreaWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
                     val zoneAreaHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                    val scaleX = zoneAreaWidthPx / currentLayout.screenWidth
-                    val scaleY = zoneAreaHeightPx / currentLayout.screenHeight
+                    val scaleX = zoneAreaWidthPx / safeScreenWidth
+                    val scaleY = zoneAreaHeightPx / safeScreenHeight
 
-                    val zonesSorted = currentLayout.zones.sortedBy { it.zIndex }
+                    val zonesSorted = safeZones.sortedBy { it.zIndex ?: 0 }
                     zonesSorted.forEach { zone ->
-                        key(zone.zoneId) {
-                            val leftDp = (zone.x * scaleX / density).dp
-                            val topDp = (zone.y * scaleY / density).dp
-                            val widthDp = (zone.width * scaleX / density).dp
-                            val heightDp = (zone.height * scaleY / density).dp
+                        val zoneId = zone.zoneId ?: 0
+                        key(zoneId) {
+                            val leftDp = ((zone.x ?: 0) * scaleX / density).dp
+                            val topDp = ((zone.y ?: 0) * scaleY / density).dp
+                            val widthDp = ((zone.width ?: 0) * scaleX / density).dp
+                            val heightDp = ((zone.height ?: 0) * scaleY / density).dp
 
                             Box(
                                 modifier = Modifier
@@ -159,13 +164,14 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
                                     .size(widthDp, heightDp)
                                     .clip(RectangleShape)
                                     .graphicsLayer { clip = true }
-                                    .background(parseHexColor(zone.backgroundColor))
+                                    .background(parseHexColor(zone.backgroundColor ?: "#000000"))
                                     .border(2.dp, Color.White)
                             ) {
                                 ZonePlaylistContent(
-                                    zoneId = zone.zoneId,
-                                    playlist = zone.playlist,
-                                    modifier = Modifier.fillMaxSize()
+                                    zoneId = zoneId,
+                                    playlist = zone.playlist ?: emptyList(),
+                                    modifier = Modifier.fillMaxSize(),
+                                    onDisplayedMediaChanged = { z, m -> viewModel.setCurrentDisplayedMediaId(z, m) }
                                 )
                             }
                         }
@@ -174,7 +180,8 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
 
                     if (bottomTickers.isNotEmpty()) {
                         bottomTickers.forEach { ticker ->
-                            val heightDp = (ticker.height * tickerScaleY / density).dp
+                            val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
+                            val heightDp = (tickerHeight * tickerScaleY / density).dp
                             TickerStrip(
                                 ticker = ticker,
                                 heightDp = heightDp,
@@ -190,13 +197,13 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val density = LocalDensity.current.density
                 val scaleY = with(LocalDensity.current) { maxHeight.toPx() } / 1080f
-                val topTickers = tickers.filter { it.position.equals("top", ignoreCase = true) }.sortedBy { it.priority }
-                val bottomTickers = tickers.filter { it.position.equals("bottom", ignoreCase = true) }.sortedBy { it.priority }
+                val topTickers = tickers.filter { (it.position ?: "").equals("top", ignoreCase = true) }.sortedBy { it.priority ?: 0 }
+                val bottomTickers = tickers.filter { (it.position ?: "").equals("bottom", ignoreCase = true) }.sortedBy { it.priority ?: 0 }
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (topTickers.isNotEmpty()) {
                         topTickers.forEach { ticker ->
-                            val heightDp = (ticker.height * scaleY / density).dp
+                            val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
                             TickerStrip(
                                 ticker = ticker,
                                 heightDp = heightDp,
@@ -223,7 +230,7 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
 
                     if (bottomTickers.isNotEmpty()) {
                         bottomTickers.forEach { ticker ->
-                            val heightDp = (ticker.height * scaleY / density).dp
+                            val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
                             TickerStrip(
                                 ticker = ticker,
                                 heightDp = heightDp,

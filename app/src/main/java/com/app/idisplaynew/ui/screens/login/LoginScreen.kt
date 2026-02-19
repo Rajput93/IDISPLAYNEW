@@ -279,7 +279,7 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.size(8.dp))
                         }
                         Text(
-                            text = if (isLoading) "..." else stringResource(R.string.login),
+                            text = if (isLoading) "" else stringResource(R.string.login),
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = (MaterialTheme.typography.labelLarge.fontSize.value * responsive.bodyFontScale).sp

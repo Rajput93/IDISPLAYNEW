@@ -2,6 +2,8 @@ package com.app.idisplaynew.data.repository
 
 import com.app.idisplaynew.data.model.AckCommandPayload
 import com.app.idisplaynew.data.model.DeviceCommandsResponse
+import com.app.idisplaynew.data.model.HeartbeatPayload
+import com.app.idisplaynew.data.model.HeartbeatResponse
 import com.app.idisplaynew.data.model.LoginPayload
 import com.app.idisplaynew.data.model.LoginResponse
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
@@ -77,6 +79,20 @@ object Repository {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(payload)
+        }
+    }
+
+    suspend fun postHeartbeat(baseUrl: String, token: String, payload: HeartbeatPayload): Result<HeartbeatResponse> {
+        return try {
+            val url = buildUrl(baseUrl, ApiEndpoints.HEARTBEAT)
+            val response = httpClient.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+            Result.success(response.body())
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

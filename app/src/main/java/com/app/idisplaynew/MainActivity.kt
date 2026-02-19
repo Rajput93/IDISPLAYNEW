@@ -28,6 +28,7 @@ import com.app.idisplaynew.data.repository.ScheduleRepository
 import com.app.idisplaynew.data.viewmodel.HomeViewModel
 import com.app.idisplaynew.data.viewmodel.HomeViewModelFactory
 import com.app.idisplaynew.data.viewmodel.LoginViewModel
+import com.app.idisplaynew.data.remote.DeviceStatsProvider
 import com.app.idisplaynew.data.viewmodel.ScreenshotViewModel
 import com.app.idisplaynew.data.viewmodel.ScreenshotViewModelFactory
 import com.app.idisplaynew.data.viewmodel.LoginViewModelFactory
@@ -108,8 +109,9 @@ private fun DisplayHubApp() {
             val scheduleRepository = remember(db, downloadManager, dataStoreManager) {
                 ScheduleRepository(Repository, db, downloadManager, dataStoreManager)
             }
+            val deviceStatsProvider = remember { DeviceStatsProvider(appContext) }
             val homeViewModel: HomeViewModel = viewModel(
-                factory = HomeViewModelFactory(scheduleRepository)
+                factory = HomeViewModelFactory(scheduleRepository, dataStoreManager, deviceStatsProvider)
             )
             val screenshotViewModel: ScreenshotViewModel = viewModel(
                 factory = ScreenshotViewModelFactory(dataStoreManager)
