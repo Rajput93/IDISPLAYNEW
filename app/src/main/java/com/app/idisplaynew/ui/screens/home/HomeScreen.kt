@@ -129,13 +129,15 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (topTickers.isNotEmpty()) {
                         topTickers.forEach { ticker ->
-                            val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
-                            val heightDp = (tickerHeight * tickerScaleY / density).dp
-                            TickerStrip(
-                                ticker = ticker,
-                                heightDp = heightDp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            key(ticker.id ?: 0, ticker.text.orEmpty(), ticker.position.orEmpty()) {
+                                val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
+                                val heightDp = (tickerHeight * tickerScaleY / density).dp
+                                TickerStrip(
+                                    ticker = ticker,
+                                    heightDp = heightDp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
 
@@ -180,13 +182,15 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
 
                     if (bottomTickers.isNotEmpty()) {
                         bottomTickers.forEach { ticker ->
-                            val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
-                            val heightDp = (tickerHeight * tickerScaleY / density).dp
-                            TickerStrip(
-                                ticker = ticker,
-                                heightDp = heightDp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            key(ticker.id ?: 0, ticker.text.orEmpty(), ticker.position.orEmpty()) {
+                                val tickerHeight = (ticker.height ?: 50).coerceAtLeast(1)
+                                val heightDp = (tickerHeight * tickerScaleY / density).dp
+                                TickerStrip(
+                                    ticker = ticker,
+                                    heightDp = heightDp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
@@ -203,12 +207,14 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (topTickers.isNotEmpty()) {
                         topTickers.forEach { ticker ->
-                            val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
-                            TickerStrip(
-                                ticker = ticker,
-                                heightDp = heightDp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            key(ticker.id ?: 0, ticker.text.orEmpty(), ticker.position.orEmpty()) {
+                                val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
+                                TickerStrip(
+                                    ticker = ticker,
+                                    heightDp = heightDp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
 
@@ -230,12 +236,14 @@ fun HomeScreen(viewModel: HomeViewModel, screenshotViewModel: ScreenshotViewMode
 
                     if (bottomTickers.isNotEmpty()) {
                         bottomTickers.forEach { ticker ->
-                            val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
-                            TickerStrip(
-                                ticker = ticker,
-                                heightDp = heightDp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            key(ticker.id ?: 0, ticker.text.orEmpty(), ticker.position.orEmpty()) {
+                                val heightDp = ((ticker.height ?: 50) * scaleY / density).dp
+                                TickerStrip(
+                                    ticker = ticker,
+                                    heightDp = heightDp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }

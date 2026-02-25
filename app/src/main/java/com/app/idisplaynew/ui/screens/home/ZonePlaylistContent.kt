@@ -37,7 +37,7 @@ private fun isDisplayable(item: ScheduleCurrentResponse.ScheduleResult.Layout.Zo
         true -> url.isNotBlank()
         false -> when (type.lowercase()) {
             "image", "document" -> url.isNotBlank()
-            "notice", "event", "motivational", "weather", "url" ->
+            "dynamic", "notice", "event", "motivational", "weather", "url" ->
                 !item.htmlContent.isNullOrBlank() || !item.sourceUrl.isNullOrBlank()
             else -> url.isNotBlank()
         }
@@ -164,7 +164,7 @@ fun ZonePlaylistContent(
                     currentIndex = (displayIndex + 1) % playlist.size
                 }
             )
-            "notice", "event", "motivational", "weather", "url" -> ZoneWebView(
+            "dynamic", "notice", "event", "motivational", "weather", "url" -> ZoneWebView(
                 htmlContent = item.htmlContent,
                 sourceUrl = item.sourceUrl,
                 durationSeconds = (item.duration ?: 0).coerceAtLeast(1),

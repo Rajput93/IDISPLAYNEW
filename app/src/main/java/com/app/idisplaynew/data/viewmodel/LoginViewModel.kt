@@ -20,7 +20,7 @@ import java.net.SocketTimeoutException
 data class LoginUiState(
     val baseUrl: String = "https://idisplay-backend.digitalnoticeboard.biz/api/",
   //  val baseUrl: String = "https://idisplay-stage-api.digitalnoticeboard.biz/api/",
-    val clientId: String = "DVC-2E1D4E68"
+    val clientId: String = "DVC-50FCC669"
 )
 
 class LoginViewModel(

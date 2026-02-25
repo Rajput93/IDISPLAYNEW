@@ -71,8 +71,8 @@ class HomeViewModel(
             scheduleRepository.getCurrentLayoutAndTickers()
                 .catch { _error.value = it.message }
                 .collect { (layout, tickers) ->
-                    _layout.value = layout
-                    _tickers.value = tickers
+                    if (_layout.value != layout) _layout.value = layout
+                    if (_tickers.value != tickers) _tickers.value = tickers
                     _isLoading.value = false
                 }
         }
@@ -82,8 +82,8 @@ class HomeViewModel(
                 scheduleRepository.syncFromApi()
                 delay(150) // let DB commits be visible
                 val (layout, tickers) = scheduleRepository.getCurrentLayoutAndTickersSnapshot()
-                _layout.value = layout
-                _tickers.value = tickers
+                if (_layout.value != layout) _layout.value = layout
+                if (_tickers.value != tickers) _tickers.value = tickers
                 scheduleRepository.notifyLayoutRefresh()
                 delay(5_000)
             }
@@ -94,8 +94,8 @@ class HomeViewModel(
                 scheduleRepository.fetchAndProcessCommands()
                 delay(150)
                 val (layout, tickers) = scheduleRepository.getCurrentLayoutAndTickersSnapshot()
-                _layout.value = layout
-                _tickers.value = tickers
+                if (_layout.value != layout) _layout.value = layout
+                if (_tickers.value != tickers) _tickers.value = tickers
                 scheduleRepository.notifyLayoutRefresh()
                 delay(10_000)
             }

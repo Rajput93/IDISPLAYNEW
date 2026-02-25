@@ -138,6 +138,8 @@ private fun ensureSoftwareBitmap(bitmap: Bitmap): Bitmap? {
         bitmap.recycle()
         return software
     }
+
+    
     return bitmap
 }
 

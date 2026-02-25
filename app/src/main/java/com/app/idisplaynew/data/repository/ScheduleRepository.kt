@@ -274,7 +274,7 @@ class ScheduleRepository(
 
         // 2) If API returned no current schedule, clear all (schedule removed from API)
         if (!response.isSuccess || response.result == null) {
-            _tickersFromApi.value = emptyList()
+            if (_tickersFromApi.value.isNotEmpty()) _tickersFromApi.value = emptyList()
             allSchedules.filter { it !in expired }.forEach { schedule ->
                 mediaDao.getAllByScheduleId(schedule.scheduleId).forEach { media ->
                     downloadManager.deleteFileByPath(media.localPath)
@@ -290,10 +290,11 @@ class ScheduleRepository(
         val result = response.result!!
         val scheduleId = result.scheduleId ?: 0
         val layout = result.layout
+
         val tickersFromResponse = result.tickers ?: emptyList()
 
         if (layout == null) {
-            _tickersFromApi.value = tickersFromResponse
+            if (_tickersFromApi.value != tickersFromResponse) _tickersFromApi.value = tickersFromResponse
             // API returned no layout: clear all schedule data so only API data is shown (default 4 zones)
             scheduleDao.getAll().forEach { schedule ->
                 mediaDao.getAllByScheduleId(schedule.scheduleId).forEach { media ->
@@ -305,6 +306,16 @@ class ScheduleRepository(
             refreshTrigger.tryEmit(Unit)
             layoutRefreshCount.value += 1
             return null
+        }
+
+        // 2b) API says "current" is this scheduleId (e.g. default layout). Remove any other schedule
+        // so that when user moved a schedule to past date, we don't keep showing the old one.
+        scheduleDao.getAll().filter { it.scheduleId != scheduleId }.forEach { schedule ->
+            mediaDao.getAllByScheduleId(schedule.scheduleId).forEach { media ->
+                downloadManager.deleteFileByPath(media.localPath)
+                mediaDao.delete(media)
+            }
+            scheduleDao.delete(schedule)
         }
 
         val layoutZones = layout.zones ?: emptyList()
@@ -331,7 +342,7 @@ class ScheduleRepository(
             return null
         }
 
-        _tickersFromApi.value = tickersFromResponse
+        if (_tickersFromApi.value != tickersFromResponse) _tickersFromApi.value = tickersFromResponse
         val layoutJson = json.encodeToString(layout)
         val currentLayoutFileNames = apiLayoutFileNames
 
@@ -367,8 +378,10 @@ class ScheduleRepository(
         layoutZones.forEach { zone ->
             val zoneId = zone.zoneId ?: 0
             (zone.playlist ?: emptyList()).forEach { item ->
+                val itemType = (item.type ?: "").lowercase()
+                val isDownloadableType = itemType == "video" || itemType == "image" || itemType == "document"
                 val itemUrl = item.url ?: ""
-                if (itemUrl.isNotBlank()) {
+                if (itemUrl.isNotBlank() && isDownloadableType) {
                     val downloadUrl = resolveMediaUrl(normalizedBaseUrl, itemUrl)
                     val effectiveFileName = (item.fileName ?: "").takeIf { it.isNotBlank() }
                         ?: deriveFileNameFromUrl(itemUrl, zoneId, item.mediaId ?: 0, item.type ?: "video")
