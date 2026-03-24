@@ -7,8 +7,8 @@
     <string name="base_url_hint">Enter API base URL (e.g. https://your-server.com/api/)</string>
     <string name="device_id">Device ID</string>
     <string name="device_id_hint">Enter device ID</string>
-    <string name="client_id">Client ID</string>
-    <string name="client_id_hint">Enter your client ID</string>
+    <string name="client_id">Device ID</string>
+    <string name="client_id_hint">Enter your device ID</string>
     <string name="base_url_placeholder">https://api.example.com</string>
     <string name="login">Login</string>
     <string name="error_base_url_required">Base URL is required</string>

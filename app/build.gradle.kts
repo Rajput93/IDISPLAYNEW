@@ -32,6 +32,8 @@ android {
         }
     }
     compileOptions {
+        // Required by org.jellyfin.media3:media3-ffmpeg-decoder (AAR metadata)
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -44,6 +46,9 @@ android {
 }
 
 dependencies {
+    // JDK APIs on older Android (required when coreLibraryDesugaringEnabled = true)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
     implementation(libs.androidx.core.ktx)
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -85,11 +90,13 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.3")
     implementation("io.coil-kt:coil-compose:2.1.0")
 
-    // Video playback (ExoPlayer / Media3)
-    implementation("androidx.media3:media3-exoplayer:1.2.1")
-    implementation("androidx.media3:media3-ui:1.2.1")
-    implementation("androidx.media3:media3-common:1.2.1")
-    implementation("androidx.media3:media3-datasource:1.2.1")
+    // Video: ExoPlayer + Jellyfin FFmpeg (software decode). No BOM — use explicit versions that resolve on google()/mavenCentral().
+    val media3Version = "1.2.1"
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.2.1+1")
 
     //data store(sharedPreference)
     implementation("androidx.datastore:datastore-preferences:1.1.2")

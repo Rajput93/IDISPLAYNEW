@@ -40,8 +40,12 @@ class MediaDownloadManager(private val context: Context) {
     /** Returns existing file path if a file with this [fileName] exists in media dir; null otherwise. */
     fun getExistingFilePath(fileName: String): String? {
         if (fileName.isBlank()) return null
-        val file = File(mediaDir, fileName)
-        return file.absolutePath.takeIf { file.exists() }
+        val exact = File(mediaDir, fileName)
+        if (exact.exists()) return exact.absolutePath
+        // API / layout may differ in casing from the actual file (e.g. UUID names)
+        return mediaDir.listFiles()
+            ?.firstOrNull { it.isFile && it.name.equals(fileName, ignoreCase = true) }
+            ?.absolutePath
     }
 
     /** Streams download to file to avoid OOM on large videos (no full response in memory). */

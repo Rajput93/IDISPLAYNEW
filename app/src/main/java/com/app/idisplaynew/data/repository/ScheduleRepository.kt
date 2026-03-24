@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.time.Instant
 
 private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -123,42 +124,117 @@ class ScheduleRepository(
             }
             .flowOn(Dispatchers.IO)
 
+    /**
+     * Same naming as [syncFromApi] so DB rows, disk files, and layout JSON always align.
+     * Prefer [originalFileName] when [fileName] is blank (common for UUID files on server).
+     */
+    private fun effectiveMediaFileName(
+        item: ScheduleCurrentResponse.ScheduleResult.Layout.Zone.PlaylistItem,
+        zoneId: Int,
+        mediaId: Int
+    ): String {
+        val fromApi = (item.fileName ?: "").trim()
+        if (fromApi.isNotBlank()) return fromApi
+        val fromOriginal = (item.originalFileName ?: "").trim()
+        if (fromOriginal.isNotBlank()) return fromOriginal
+        return deriveFileNameFromUrl(item.url ?: "", zoneId, mediaId, item.type ?: "video")
+    }
+
+    /**
+     * Resolves local file path for a playlist item without using [associate], which drops rows when
+     * multiple [MediaFileEntity] share the same (zoneId, mediaId) — a case that breaks the last item.
+     */
+    private fun resolveLocalPathForPlaylistItem(
+        zoneId: Int,
+        item: ScheduleCurrentResponse.ScheduleResult.Layout.Zone.PlaylistItem,
+        mediaList: List<MediaFileEntity>
+    ): String? {
+        val mediaId = item.mediaId ?: 0
+        val effectiveName = effectiveMediaFileName(item, zoneId, mediaId)
+        val origAlt = (item.originalFileName ?: "").trim().takeIf { it.isNotBlank() && !it.equals(effectiveName, ignoreCase = true) }
+
+        fun File.lengthIfPresent(): Long? = takeIf { exists() && isFile }?.length()
+
+        val presentRows = mediaList.filter {
+            it.localPath != null && downloadManager.isFilePresent(it.localPath!!)
+        }
+
+        // 1) zone + mediaId + exact fileName (disambiguates duplicate zone+media rows)
+        presentRows.firstOrNull {
+            it.zoneId == zoneId && it.mediaId == mediaId &&
+                it.fileName.equals(effectiveName, ignoreCase = true)
+        }?.localPath?.let { return it }
+
+        // 2) zone + mediaId (any file — legacy / single row per slot)
+        presentRows.firstOrNull { it.zoneId == zoneId && it.mediaId == mediaId }?.localPath?.let { return it }
+
+        // 3) Match alternate originalFileName stored in DB
+        if (origAlt != null) {
+            presentRows.firstOrNull {
+                it.zoneId == zoneId && it.mediaId == mediaId &&
+                    it.fileName.equals(origAlt, ignoreCase = true)
+            }?.localPath?.let { return it }
+        }
+
+        // 4) fileName alone (unique index in DB)
+        presentRows.firstOrNull { it.fileName.equals(effectiveName, ignoreCase = true) }?.localPath?.let { return it }
+
+        // 5) On-disk lookup (exact + case-insensitive)
+        downloadManager.getExistingFilePath(effectiveName)?.let { return it }
+        if (origAlt != null) downloadManager.getExistingFilePath(origAlt)?.let { return it }
+
+        // 5b) URL basename (e.g. 3e9c7a8b-....mp4) — API often sets a long display `fileName` while
+        // the same asset was saved earlier under the URL’s file name only.
+        item.url?.let { u ->
+            fileNameFromMediaUrl(u)?.let { urlBase ->
+                presentRows.firstOrNull { it.fileName.equals(urlBase, ignoreCase = true) }?.localPath?.let { return it }
+                downloadManager.getExistingFilePath(urlBase)?.let { return it }
+            }
+        }
+
+        // 6) Match by declared file size (helps when names differ between API and disk)
+        val expectedSize = item.fileSizeBytes ?: 0L
+        if (expectedSize > 0L) {
+            presentRows.firstOrNull { row ->
+                row.zoneId == zoneId && row.mediaId == mediaId &&
+                    row.localPath?.let { File(it).lengthIfPresent() } == expectedSize
+            }?.localPath?.let { return it }
+            presentRows.firstOrNull { row ->
+                row.zoneId == zoneId &&
+                    row.localPath?.let { File(it).lengthIfPresent() } == expectedSize
+            }?.localPath?.let { return it }
+        }
+
+        return null
+    }
+
     private fun mergeLayoutWithMedia(
         layout: ScheduleCurrentResponse.ScheduleResult.Layout,
         mediaList: List<MediaFileEntity>
     ): ScheduleCurrentResponse.ScheduleResult.Layout {
-        // Map (zoneId, mediaId) -> local path so we can show video/image even when API sends blank fileName
-        val localPathByZoneAndMedia = mediaList
-            .filter { it.localPath != null && downloadManager.isFilePresent(it.localPath!!) }
-            .associate { (it.zoneId to it.mediaId) to it.localPath!! }
-        val urlByFileName = mediaList
-            .filter { it.localPath != null && downloadManager.isFilePresent(it.localPath!!) }
-            .associate { it.fileName to it.localPath!! }
         val zones = layout.zones ?: emptyList()
         val zonesWithLocalUrls = zones.map { zone ->
             val zoneId = zone.zoneId ?: 0
             val playlist = zone.playlist ?: emptyList()
             zone.copy(playlist = playlist.map { item ->
-                val mediaId = item.mediaId ?: 0
                 val type = item.type ?: ""
                 val fileName = item.fileName ?: ""
                 val url = item.url ?: ""
-                val localPath = localPathByZoneAndMedia[zoneId to mediaId]
-                    ?: fileName.takeIf { it.isNotBlank() }?.let { urlByFileName[it] }
+                val pathOnDisk = resolveLocalPathForPlaylistItem(zoneId, item, mediaList)
                 val isVideoOrImage = type.equals("video", ignoreCase = true) || type.equals("image", ignoreCase = true)
                 val isDocument = type.equals("document", ignoreCase = true)
                 val isPdf = fileName.endsWith(".pdf", true) || url.contains(".pdf", true)
                 val displayUrl = when {
                     isDocument -> when {
-                        localPath != null && isPdf -> "file://$localPath"
+                        pathOnDisk != null && isPdf -> "file://$pathOnDisk"
                         else -> url
                     }
                     isVideoOrImage -> when {
-                        localPath != null -> "file://$localPath"
+                        pathOnDisk != null -> "file://$pathOnDisk"
                         else -> ""
                     }
                     else -> when {
-                        localPath != null -> "file://$localPath"
+                        pathOnDisk != null -> "file://$pathOnDisk"
                         else -> url
                     }
                 }
@@ -174,6 +250,12 @@ class ScheduleRepository(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Last path segment of a media URL (e.g. `3e9c7a8b-....mp4`), used when API `fileName` ≠ name on disk. */
+    private fun fileNameFromMediaUrl(url: String): String? {
+        val part = url.trim().substringAfterLast('/', "").substringBefore('?').trim()
+        return part.takeIf { it.isNotBlank() && it.contains('.') }
     }
 
     /** Derive a unique fileName when API sends blank (so we can still download and look up by zoneId+mediaId). */
@@ -383,12 +465,19 @@ class ScheduleRepository(
                 val itemUrl = item.url ?: ""
                 if (itemUrl.isNotBlank() && isDownloadableType) {
                     val downloadUrl = resolveMediaUrl(normalizedBaseUrl, itemUrl)
-                    val effectiveFileName = (item.fileName ?: "").takeIf { it.isNotBlank() }
-                        ?: deriveFileNameFromUrl(itemUrl, zoneId, item.mediaId ?: 0, item.type ?: "video")
+                    val effectiveFileName = effectiveMediaFileName(item, zoneId, item.mediaId ?: 0)
                     currentFileNames.add(effectiveFileName)
                     val existing = mediaDao.getByFileName(effectiveFileName)
                     val hadLocalInDb = existing?.localPath != null && downloadManager.isFilePresent(existing.localPath)
+                    // Prefer API fileName on disk; else same bytes saved under URL basename (e.g. 3e9c7a8b-....mp4)
                     val existingPathByFileName = downloadManager.getExistingFilePath(effectiveFileName)
+                        ?: run {
+                            val urlBase = fileNameFromMediaUrl(itemUrl) ?: return@run null
+                            val byUrl = downloadManager.getExistingFilePath(urlBase) ?: return@run null
+                            val expected = item.fileSizeBytes ?: 0L
+                            val len = File(byUrl).length()
+                            if (expected <= 0L || len == expected) byUrl else null
+                        }
                     val localPath = when {
                         hadLocalInDb -> existing!!.localPath
                         existingPathByFileName != null -> existingPathByFileName
