@@ -37,6 +37,10 @@ class MediaDownloadManager(private val context: Context) {
             return File(baseDir, MEDIA_DIR_NAME).also { if (!it.exists()) it.mkdirs() }
         }
 
+    /** Directory for optimized/transcoded media files. */
+    fun getOptimizedMediaDir(): File =
+        File(mediaDir, OPTIMIZED_DIR_NAME).also { if (!it.exists()) it.mkdirs() }
+
     /** Returns existing file path if a file with this [fileName] exists in media dir; null otherwise. */
     fun getExistingFilePath(fileName: String): String? {
         if (fileName.isBlank()) return null
@@ -120,5 +124,6 @@ class MediaDownloadManager(private val context: Context) {
 
     companion object {
         const val MEDIA_DIR_NAME = "schedule_media"
+        const val OPTIMIZED_DIR_NAME = "optimized"
     }
 }

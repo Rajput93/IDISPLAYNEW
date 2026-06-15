@@ -3,9 +3,6 @@ package com.app.idisplaynew.ui.screens.home
 import android.annotation.SuppressLint
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -21,22 +18,27 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import coil.compose.AsyncImage
 import com.app.idisplaynew.data.model.ScheduleCurrentResponse
+import kotlinx.coroutines.delay
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
@@ -86,51 +88,73 @@ fun TickerStrip(
                 .height(heightDp)
                 .clip(RectangleShape)
         ) {
-            var textWidthPx by remember { mutableStateOf(0f) }
-            val containerWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
+            val density = LocalDensity.current
+            var textWidthPx by remember(ticker.text) { mutableIntStateOf(0) }
+            val containerWidthPx = with(density) { maxWidth.toPx().toInt() }
+            val gapPx = with(density) { 24.dp.toPx().toInt() }
 
-            key(textWidthPx, ticker.speed ?: 1) {
-                val speed = (ticker.speed ?: 1).coerceAtLeast(1)
-                val durationMs = (60000 / speed).toInt().coerceIn(1000, 120000)
-                val targetOffsetPx = if (textWidthPx > 0) -(textWidthPx + 16f) else -containerWidthPx
-                val infiniteTransition = rememberInfiniteTransition(label = "ticker")
-                val offsetPx by infiniteTransition.animateFloat(
-                    initialValue = containerWidthPx,
-                    targetValue = targetOffsetPx,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(
-                            durationMillis = if (textWidthPx > 0) durationMs else 1,
-                            easing = LinearEasing
-                        ),
-                        repeatMode = RepeatMode.Restart,
-                        initialStartOffset = androidx.compose.animation.core.StartOffset(0)
-                    ),
-                    label = "tickerOffset"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(heightDp)
-                        .clip(RectangleShape)
-                        .layout { measurable, constraints ->
-                            val unboundedConstraints = constraints.copy(maxWidth = Int.MAX_VALUE)
-                            val placeable = measurable.measure(unboundedConstraints)
-                            if (placeable.width > 0) textWidthPx = placeable.width.toFloat()
-                            layout(constraints.maxWidth, constraints.maxHeight) {
-                                placeable.place(offsetPx.toInt(), 0)
-                            }
-                        },
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Text(
-                        text = ticker.text.orEmpty(),
-                        color = textColor,
-                        fontSize = (ticker.fontSize ?: 24).sp,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+            /**
+             * Spec: smooth right-to-left ticker.
+             * - Speed controlled by numeric value (e.g. 32)
+             * - Duration derived from (textWidth + screenWidth) / speed
+             * - Update every ~16ms (≈60fps)
+             * - Reset when text fully exits left side
+             */
+            val speedValue = (ticker.speed ?: 32).coerceIn(1, 300)
+            val travelPx by remember(containerWidthPx, textWidthPx, gapPx) {
+                derivedStateOf { (containerWidthPx + textWidthPx + gapPx).coerceAtLeast(containerWidthPx + gapPx) }
+            }
+            val durationMs by remember(travelPx, speedValue) {
+                derivedStateOf {
+                    // Interpret "speed" as seconds per full travel / or just a scalar: higher = faster.
+                    // Map to px/sec so 32 feels reasonably fast across screens.
+                    val pxPerSec = (speedValue * 20f).coerceAtLeast(60f)
+                    ((travelPx / pxPerSec) * 1000f).toLong().coerceIn(1000L, 300_000L)
                 }
+            }
+            val pxPerMs by remember(travelPx, durationMs) {
+                derivedStateOf { travelPx.toFloat() / durationMs.toFloat().coerceAtLeast(1f) }
+            }
+
+            var offsetX by remember(ticker.id, ticker.text, ticker.speed, containerWidthPx, textWidthPx) {
+                mutableFloatStateOf(containerWidthPx.toFloat())
+            }
+            LaunchedEffect(ticker.id, ticker.text, ticker.speed, containerWidthPx, textWidthPx, durationMs) {
+                // restart cleanly on any update
+                offsetX = containerWidthPx.toFloat()
+                while (true) {
+                    // ~60 FPS
+                    delay(16L)
+                    offsetX -= pxPerMs * 16f
+                    val exitLeft = -textWidthPx.toFloat() - gapPx.toFloat()
+                    if (offsetX <= exitLeft) {
+                        offsetX = containerWidthPx.toFloat()
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RectangleShape),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = ticker.text.orEmpty(),
+                    color = textColor,
+                    fontSize = (ticker.fontSize ?: 24).sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .onSizeChanged { sz ->
+                            // Update only when changed to avoid recompose churn.
+                            val w = sz.width
+                            if (w > 0 && w != textWidthPx) textWidthPx = w
+                        }
+                        .graphicsLayer {
+                            translationX = offsetX
+                        }
+                )
             }
         }
     }

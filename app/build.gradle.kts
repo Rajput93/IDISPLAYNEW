@@ -96,6 +96,8 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("androidx.media3:media3-transformer:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.2.1+1")
 
     //data store(sharedPreference)

@@ -374,9 +374,11 @@ class ScheduleRepository(
         val layout = result.layout
 
         val tickersFromResponse = result.tickers ?: emptyList()
+        // IMPORTANT: tickers must update even when layout/media are unchanged (skip logic below).
+        // Otherwise changes like speed/text won't render until layoutId/lastUpdated changes.
+        if (_tickersFromApi.value != tickersFromResponse) _tickersFromApi.value = tickersFromResponse
 
         if (layout == null) {
-            if (_tickersFromApi.value != tickersFromResponse) _tickersFromApi.value = tickersFromResponse
             // API returned no layout: clear all schedule data so only API data is shown (default 4 zones)
             scheduleDao.getAll().forEach { schedule ->
                 mediaDao.getAllByScheduleId(schedule.scheduleId).forEach { media ->
@@ -423,8 +425,6 @@ class ScheduleRepository(
             apiLayoutFileNames == currentDbFileNames) {
             return null
         }
-
-        if (_tickersFromApi.value != tickersFromResponse) _tickersFromApi.value = tickersFromResponse
         val layoutJson = json.encodeToString(layout)
         val currentLayoutFileNames = apiLayoutFileNames
 

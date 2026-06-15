@@ -4,6 +4,8 @@ import android.net.Uri
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -26,8 +29,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.app.idisplaynew.R
+import com.app.idisplaynew.data.local.MediaDownloadManager
+import com.app.idisplaynew.data.local.VideoOptimizationManager
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.launch
 
 /** Resolves file paths with proper encoding (spaces, etc.); avoids blank playback from bad file:// URIs. */
 private fun videoUriFromString(videoUrl: String): Uri = when {
@@ -49,6 +55,8 @@ fun ZoneVideoPlayer(
     playerKey: Int = 0
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val downloadManager = remember { MediaDownloadManager(context) }
 
     // Tight buffers avoid OOM on 4K. FFmpeg extension decodes in software (like VLC) when MediaCodec can't.
     val exoPlayer = remember(playerKey) {
@@ -75,6 +83,8 @@ fun ZoneVideoPlayer(
     }
     val playbackErrorAttempts = remember(playerKey) { AtomicInteger(0) }
     var playerView by remember(playerKey) { mutableStateOf<PlayerView?>(null) }
+    var lastSourceLocalPath by remember(playerKey) { mutableStateOf<String?>(null) }
+    var triedOptimized by remember(playerKey) { mutableStateOf(false) }
 
     val currentOnPlaybackEnded = rememberUpdatedState(onPlaybackEnded)
     val currentVideoUrl = rememberUpdatedState(videoUrl)
@@ -84,8 +94,18 @@ fun ZoneVideoPlayer(
     LaunchedEffect(videoUrl) {
         if (videoUrl.isBlank()) return@LaunchedEffect
         playbackErrorAttempts.set(0)
-        val uri = videoUriFromString(videoUrl)
-        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+        val originalUri = videoUriFromString(videoUrl)
+        triedOptimized = false
+        lastSourceLocalPath = originalUri.path
+        val playableUri = if (originalUri.scheme.equals("file", ignoreCase = true) && !originalUri.path.isNullOrBlank()) {
+            val optimizedPath = VideoOptimizationManager.ensureOptimizedPlayablePath(
+                context = context,
+                downloadManager = downloadManager,
+                sourcePath = originalUri.path!!
+            )
+            File(optimizedPath).toUri()
+        } else originalUri
+        exoPlayer.setMediaItem(MediaItem.fromUri(playableUri))
         exoPlayer.prepare()
         exoPlayer.play()
     }
@@ -101,9 +121,40 @@ fun ZoneVideoPlayer(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                // 4K UHD / HEVC often fails on devices that cannot decode — check Logcat; backend may need a 1080p variant.
                 Log.e("ZoneVideoPlayer", "Playback error url=${currentVideoUrl.value}", error)
-                // One retry (buffer/decoder) before advancing playlist — avoids skipping large files on transient failures.
+                val localPath = lastSourceLocalPath
+                if (!triedOptimized && !localPath.isNullOrBlank()) {
+                    triedOptimized = true
+                    scope.launch {
+                        try {
+                            val optimizedPath = VideoOptimizationManager.ensureOptimizedPlayablePath(
+                                context = context,
+                                downloadManager = downloadManager,
+                                sourcePath = localPath
+                            )
+                            if (optimizedPath != localPath) {
+                                Log.w("ZoneVideoPlayer", "Retrying with optimized=$optimizedPath")
+                                exoPlayer.setMediaItem(MediaItem.fromUri(File(optimizedPath).toUri()))
+                                exoPlayer.prepare()
+                                exoPlayer.play()
+                                return@launch
+                            }
+                        } catch (e: Exception) {
+                            Log.e("ZoneVideoPlayer", "Optimization retry failed", e)
+                        }
+                        // fallback to normal retry/advance
+                        if (playbackErrorAttempts.incrementAndGet() <= 1) {
+                            exoPlayer.seekToDefaultPosition()
+                            exoPlayer.prepare()
+                            exoPlayer.play()
+                        } else {
+                            callbackState.value?.invoke()
+                        }
+                    }
+                    return
+                }
+
+                // One retry (buffer/decoder) before advancing playlist — avoids skipping transient failures.
                 if (playbackErrorAttempts.incrementAndGet() <= 1) {
                     exoPlayer.seekToDefaultPosition()
                     exoPlayer.prepare()
